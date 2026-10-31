@@ -80,6 +80,13 @@ if CHAT_MODEL_BASE_URL:
     CHAT_MODEL_BASE_URL = CHAT_MODEL_BASE_URL.split('#')[0].strip()
 CHAT_MODEL_NAME = os.environ.get("CHAT_MODEL_NAME")
 
+# Translation model configuration (optional - falls back to TEXT_MODEL_* if not set)
+TRANSLATION_MODEL_API_KEY = os.environ.get("TRANSLATION_MODEL_API_KEY")
+TRANSLATION_MODEL_BASE_URL = os.environ.get("TRANSLATION_MODEL_BASE_URL")
+if TRANSLATION_MODEL_BASE_URL:
+    TRANSLATION_MODEL_BASE_URL = TRANSLATION_MODEL_BASE_URL.split('#')[0].strip()
+TRANSLATION_MODEL_NAME = os.environ.get("TRANSLATION_MODEL_NAME")
+
 # Chat-specific GPT-5 settings (optional - falls back to main GPT5_* settings)
 CHAT_GPT5_REASONING_EFFORT = os.environ.get("CHAT_GPT5_REASONING_EFFORT")
 CHAT_GPT5_VERBOSITY = os.environ.get("CHAT_GPT5_VERBOSITY")
@@ -104,7 +111,8 @@ def _parse_extra_body(env_var):
 
 TEXT_MODEL_EXTRA_BODY, TEXT_MODEL_EXTRA_BODY_ERROR = _parse_extra_body("TEXT_MODEL_EXTRA_BODY")
 CHAT_MODEL_EXTRA_BODY, CHAT_MODEL_EXTRA_BODY_ERROR = _parse_extra_body("CHAT_MODEL_EXTRA_BODY")
-for _error in (TEXT_MODEL_EXTRA_BODY_ERROR, CHAT_MODEL_EXTRA_BODY_ERROR):
+TRANSLATION_MODEL_EXTRA_BODY, TRANSLATION_MODEL_EXTRA_BODY_ERROR = _parse_extra_body("TRANSLATION_MODEL_EXTRA_BODY")
+for _error in (TEXT_MODEL_EXTRA_BODY_ERROR, CHAT_MODEL_EXTRA_BODY_ERROR, TRANSLATION_MODEL_EXTRA_BODY_ERROR):
     if _error:
         logger.error(f"{_error}; requests to that model will fail until it is corrected.")
 
@@ -173,6 +181,37 @@ def get_chat_config():
     }
 
 
+def get_translation_config():
+    """
+    Get translation model configuration, falling back to TEXT_MODEL if not set.
+
+    Mirrors get_chat_config().
+    """
+    if TRANSLATION_MODEL_NAME and (TRANSLATION_MODEL_API_KEY or TRANSLATION_MODEL_BASE_URL):
+        return {
+            'api_key': TRANSLATION_MODEL_API_KEY or (TEXT_MODEL_API_KEY if (TRANSLATION_MODEL_BASE_URL or TEXT_MODEL_BASE_URL) == TEXT_MODEL_BASE_URL else None),
+            'base_url': TRANSLATION_MODEL_BASE_URL or TEXT_MODEL_BASE_URL,
+            'model_name': TRANSLATION_MODEL_NAME,
+            'gpt5_reasoning_effort': os.environ.get("GPT5_REASONING_EFFORT", "medium"),
+            'gpt5_verbosity': os.environ.get("GPT5_VERBOSITY", "medium"),
+            'gpt5_force': _gpt5_mode_forced("TRANSLATION_GPT5_FORCE_MODE"),
+            'extra_body': TRANSLATION_MODEL_EXTRA_BODY,
+            'extra_body_variable': 'TRANSLATION_MODEL_EXTRA_BODY',
+            'extra_body_error': TRANSLATION_MODEL_EXTRA_BODY_ERROR,
+        }
+    return {
+        'api_key': TEXT_MODEL_API_KEY,
+        'base_url': TEXT_MODEL_BASE_URL,
+        'model_name': TEXT_MODEL_NAME,
+        'gpt5_reasoning_effort': os.environ.get("GPT5_REASONING_EFFORT", "medium"),
+        'gpt5_verbosity': os.environ.get("GPT5_VERBOSITY", "medium"),
+        'gpt5_force': _gpt5_mode_forced(),
+        'extra_body': TEXT_MODEL_EXTRA_BODY,
+        'extra_body_variable': 'TEXT_MODEL_EXTRA_BODY',
+        'extra_body_error': TEXT_MODEL_EXTRA_BODY_ERROR,
+    }
+
+
 # Set up HTTP client with custom headers for OpenRouter app identification
 app_headers = {
     "HTTP-Referer": "https://github.com/murtaza-nasir/speakr",
@@ -190,6 +229,14 @@ http_client_no_proxy = httpx.Client(
 # no client is created and nothing is sent: the default address is a hosted
 # service, and a transcript must never go there unasked.
 TEXT_MODEL_CONFIGURED = bool(TEXT_MODEL_API_KEY) or bool(os.environ.get("TEXT_MODEL_BASE_URL", "").split('#')[0].strip())
+
+# A translation model is configured when the text model is, or when a
+# dedicated translation model has its own key or server address.
+TRANSLATION_MODEL_CONFIGURED = (
+    TEXT_MODEL_CONFIGURED
+    or bool(TRANSLATION_MODEL_API_KEY)
+    or bool(os.environ.get("TRANSLATION_MODEL_BASE_URL", "").split('#')[0].strip())
+)
 
 try:
     if not TEXT_MODEL_CONFIGURED:
@@ -238,6 +285,33 @@ try:
 except Exception as chat_client_init_e:
     logger.warning(f"Failed to initialize chat client, falling back to main client: {chat_client_init_e}")
     chat_client = client
+
+
+def _build_translation_client():
+    """The translation client: the main client, or a dedicated one when the
+    translation model has its own key or server."""
+    translation_config = get_translation_config()
+    if (translation_config['api_key'], translation_config['base_url']) == (TEXT_MODEL_API_KEY, TEXT_MODEL_BASE_URL):
+        return client
+    if not (TRANSLATION_MODEL_API_KEY or TRANSLATION_MODEL_BASE_URL or TEXT_MODEL_CONFIGURED):
+        return None
+    dedicated = OpenAI(
+        api_key=translation_config['api_key'] or "not-needed",
+        base_url=translation_config['base_url'],
+        http_client=http_client_no_proxy,
+        timeout=llm_timeout,
+        max_retries=LLM_MAX_RETRIES,
+    )
+    logger.info(f"Separate translation client initialized: {translation_config['base_url']} / {translation_config['model_name']}")
+    return dedicated
+
+
+# Create translation client (may be same as main client if no separate config)
+try:
+    translation_client = _build_translation_client()
+except Exception as translation_client_init_e:
+    logger.warning(f"Failed to initialize translation client, falling back to main client: {translation_client_init_e}")
+    translation_client = client
 
 
 def _add_extra_body(completion_args, extra_body, error):
