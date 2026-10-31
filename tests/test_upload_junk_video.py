@@ -288,3 +288,14 @@ def test_incognito_passthrough_sends_a_real_video(user, tmp_path):
     resp, connector = _incognito(user, _ffmpeg_video(tmp_path / "t.mp4"), "t.mp4")
     assert resp.status_code == 200, resp.get_data(as_text=True)
     assert connector.transcribe.call_count == 1
+
+
+@needs_ffmpeg
+@pytest.mark.parametrize("payload", ["binary", "text"])
+def test_junk_named_flac_is_refused(user, payload):
+    """ffprobe reads such a file as a FLAC stream with no sample rate and no
+    channels; it is refused at upload, as under any other name (#530)."""
+    data = open(shutil.which("ls"), "rb").read() if payload == "binary" else JUNK
+    resp, storage, enqueue, leftovers = _upload(user, data, "executable-renamed.flac")
+    _assert_refused(resp, enqueue, leftovers, user)
+    assert storage.uploaded == []

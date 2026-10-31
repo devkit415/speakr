@@ -142,6 +142,16 @@ def mp3_duration_is_estimated(filename: str, timeout: Optional[int] = None) -> b
         return False
 
 
+def _positive_or_absent(value) -> bool:
+    """True when an ffprobe stream field is missing or a positive number."""
+    if value is None:
+        return True
+    try:
+        return int(value) > 0
+    except (ValueError, TypeError):
+        return False
+
+
 def get_codec_info(filename: str, timeout: Optional[int] = None) -> Dict[str, Any]:
     """
     Get codec information for a media file.
@@ -206,6 +216,10 @@ def get_codec_info(filename: str, timeout: Optional[int] = None) -> Dict[str, An
             codec_name = stream.get('codec_name')
             
             if codec_type == 'audio':
+                # A file that is not audio can be misread as a stream with
+                # no sample rate and no channels (#530); it cannot be decoded.
+                if not _positive_or_absent(stream.get('sample_rate')) or not _positive_or_absent(stream.get('channels')):
+                    continue
                 result['has_audio'] = True
                 if result['audio_codec'] is None:  # Use first audio stream
                     result['audio_codec'] = codec_name

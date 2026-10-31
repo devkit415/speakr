@@ -258,3 +258,34 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+
+
+def test_a_stream_with_no_sample_rate_or_channels_is_not_audio():
+    """A file that is not audio can be misread as a FLAC stream with sample
+    rate 0 and no channels (#530). That stream cannot be decoded."""
+    from unittest.mock import patch
+    phantom = {'format': {'format_name': 'flac'},
+               'streams': [{'codec_type': 'audio', 'codec_name': 'flac',
+                            'sample_rate': '0', 'channels': 0}]}
+    with patch('src.utils.ffprobe.probe', return_value=phantom):
+        info = get_codec_info('x.flac')
+    assert info['has_audio'] is False
+    assert info['audio_codec'] is None
+    real = {'format': {'format_name': 'flac'},
+            'streams': [{'codec_type': 'audio', 'codec_name': 'flac',
+                         'sample_rate': '44100', 'channels': 2}]}
+    with patch('src.utils.ffprobe.probe', return_value=real):
+        info = get_codec_info('x.flac')
+    assert info['has_audio'] is True
+    assert info['audio_codec'] == 'flac'
+
+
+@pytest.mark.skipif(not _ffmpeg_available(), reason="ffmpeg/ffprobe not available")
+def test_a_real_flac_is_still_audio():
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, 'tone.flac')
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1',
+                        '-c:a', 'flac', path], check=True, capture_output=True)
+        info = get_codec_info(path)
+    assert info['has_audio'] is True
+    assert info['audio_codec'] == 'flac'
