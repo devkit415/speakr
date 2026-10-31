@@ -112,3 +112,46 @@ def normalize_language_code(value):
     # Last resort: first 2 chars happen to be a valid code (e.g. 'english' → 'en').
     # Skip — too aggressive and would map garbage to wrong languages.
     return None
+
+
+# Full output/translation target language names shared by the account preference
+# and the translation menu. Each entry is (full_name, iso_code); the iso code
+# doubles as the i18n key suffix under `languages.*`. Keep this list in sync
+# with the locale files.
+OUTPUT_LANGUAGES = [
+    ("English", "en"),
+    ("Spanish", "es"),
+    ("French", "fr"),
+    ("German", "de"),
+    ("Italian", "it"),
+    ("Portuguese", "pt"),
+    ("Dutch", "nl"),
+    ("Russian", "ru"),
+    ("Chinese", "zh"),
+    ("Japanese", "ja"),
+    ("Korean", "ko"),
+    ("Arabic", "ar"),
+    ("Hindi", "hi"),
+    ("Polish", "pl"),
+    ("Ukrainian", "uk"),
+    ("Vietnamese", "vi"),
+    ("Thai", "th"),
+    ("Turkish", "tr"),
+    ("Indonesian", "id"),
+    ("Swedish", "sv"),
+    ("Portuguese (Brazilian)", "pt-BR"),
+]
+
+
+def output_language_name_for_code(code):
+    """Map an ISO interface code to its full output-language name.
+
+    Returns None when no matching entry exists so callers can fall back.
+    """
+    if not code:
+        return None
+    needle = str(code).strip().lower()
+    for name, iso in OUTPUT_LANGUAGES:
+        if iso.lower() == needle:
+            return name
+    return None
