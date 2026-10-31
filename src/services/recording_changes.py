@@ -37,6 +37,7 @@ TRACKED_FIELDS = (
     'title', 'participants', 'notes', 'summary', 'transcription', 'status', 'meeting_date',
     'folder_id', 'is_inbox', 'is_highlighted', 'is_archived', 'audio_deleted_at', 'completed_at',
     'error_message', 'speaker_label_map', 'deletion_exempt', 'prompt_variables',
+    'transcription_translation',
 )
 
 # Column -> the word in recording.updated fields_changed. Columns not listed
@@ -47,7 +48,7 @@ WEBHOOK_FIELD_NAMES = {
     'transcription': 'transcript', 'meeting_date': 'meeting_date', 'folder_id': 'folder_id',
     'is_inbox': 'is_inbox', 'is_highlighted': 'is_highlighted', 'is_archived': 'is_archived',
     'speaker_label_map': 'speakers', 'audio_deleted_at': 'audio', 'deletion_exempt': 'deletion_exempt',
-    'prompt_variables': 'prompt_variables',
+    'prompt_variables': 'prompt_variables', 'transcription_translation': 'translation',
 }
 
 SETTLE_SECONDS = 2

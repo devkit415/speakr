@@ -336,6 +336,10 @@ def _run_migrations(app, engine):
         # webhook simply omits the field when it is not known.
         if add_column_if_not_exists(engine, 'recording', 'transcription_language', 'VARCHAR(20)'):
             app.logger.info("Added transcription_language column to recording table")
+        if add_column_if_not_exists(engine, 'recording', 'transcription_translation', 'TEXT'):
+            app.logger.info("Added transcription_translation column to recording table")
+        if add_column_if_not_exists(engine, 'recording', 'transcription_translation_language', 'VARCHAR(50)'):
+            app.logger.info("Added transcription_translation_language column to recording table")
         if add_column_if_not_exists(engine, 'recording', 'audio_duration_seconds', 'FLOAT'):
             app.logger.info("Added audio_duration_seconds column to recording table")
         if add_column_if_not_exists(engine, 'recording', 'completed_at', 'DATETIME'):
@@ -573,6 +577,10 @@ def _run_migrations(app, engine):
         # Auto summarization setting (per-user, default enabled)
         if add_column_if_not_exists(engine, 'user', 'auto_summarization', 'BOOLEAN DEFAULT 1'):
             app.logger.info("Added auto_summarization column to user table")
+
+        # Auto-translation preference (per-user, default disabled) (#translation)
+        if add_column_if_not_exists(engine, 'user', 'auto_translation', 'BOOLEAN DEFAULT 0'):
+            app.logger.info("Added auto_translation column to user table")
 
         # Transcription hints (hotwords and initial prompt for improving ASR accuracy)
         if add_column_if_not_exists(engine, 'user', 'transcription_hotwords', 'TEXT'):

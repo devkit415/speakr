@@ -40,6 +40,11 @@ class Recording(db.Model):
     # configuration rather than the audio. None when the backend did not
     # report one, or reported something that is not a language code.
     transcription_language = db.Column(db.String(20), nullable=True)
+    # Translated transcript stored alongside the original (#translation). Never
+    # overwrites transcription. NULL when no translation exists yet.
+    transcription_translation = db.Column(db.Text, nullable=True)
+    # Full language name of the translated transcript (e.g. "Spanish").
+    transcription_translation_language = db.Column(db.String(50), nullable=True)
     summary = db.Column(db.Text, nullable=True)
     status = db.Column(db.String(50), default='PENDING')  # PENDING, PROCESSING, SUMMARIZING, COMPLETED, FAILED
     audio_path = db.Column(db.String(500))
@@ -529,6 +534,8 @@ class Recording(db.Model):
             'notes': user_notes,
             'transcription': self.transcription,
             'transcription_language': self.transcription_language,
+            'transcription_translation': self.transcription_translation,
+            'transcription_translation_language': self.transcription_translation_language,
             'summary': self.summary,
             'status': self.status,
             'created_at': self.created_at.isoformat() if self.created_at else None,
