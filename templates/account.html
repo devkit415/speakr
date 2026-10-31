@@ -1149,7 +1149,7 @@
                                         <select name="output_language" id="output_language" class="mt-1 block w-full px-3 py-2 border border-[var(--border-secondary)] rounded-md shadow-sm focus:outline-none focus:ring-[var(--border-focus)] focus:border-[var(--border-focus)] sm:text-sm bg-[var(--bg-input)] text-[var(--text-primary)]">
                                             <option value="" data-sort-pin="top" data-i18n="languages.defaultModelDecides" {% if not current_user.output_language %}selected{% endif %}>Default (model decides)</option>
                                             {% for _lang_name, _lang_code in output_languages %}
-                                            <option value="{{ _lang_name }}" data-i18n="languages.{{ _lang_code }}" {% if current_user.output_language == _lang_name %}selected{% endif %}>{{ _lang_name }}</option>
+                                            <option value="{{ _lang_name }}" data-i18n=languages.{{ _lang_code }} {% if current_user.output_language == _lang_name %}selected{% endif %}>{{ _lang_name }}</option>
                                             {% endfor %}
                                         </select>
                                         <p class="text-xs text-[var(--text-light)] mt-1" data-i18n="account.languageForSummaries">Language for titles, summaries, and chat. Leave on Default to follow the model's own behaviour.</p>
