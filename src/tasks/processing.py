@@ -1801,6 +1801,12 @@ def transcribe_with_connector(app_context, recording_id, filepath, original_file
         try:
             current_app.logger.info(f"Starting connector-based transcription for recording {recording_id}...")
             recording.status = 'PROCESSING'
+            # Remember what the user asked for on THIS run: an explicit
+            # language code, or None for auto-detect. Translation compares it
+            # with its target to skip the LLM when there is nothing to
+            # translate; transcription_language cannot serve that purpose
+            # because the service reports the detected language either way.
+            recording.transcription_requested_language = language
             transcription_start_time = time.time()
             db.session.commit()
 
@@ -2407,7 +2413,11 @@ def transcribe_with_connector(app_context, recording_id, filepath, original_file
                 if (not admin_disabled) and user is not None and getattr(user, 'auto_translation', False):
                     target_language = None
                     if getattr(user, 'output_language', None):
-                        target_language = user.output_language
+                        try:
+                            from src.api.recordings import _canonical_translation_language
+                            target_language = _canonical_translation_language(user.output_language) or user.output_language
+                        except Exception:
+                            target_language = user.output_language
                     else:
                         try:
                             from src.utils.language import output_language_name_for_code

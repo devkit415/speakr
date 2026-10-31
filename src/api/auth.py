@@ -197,6 +197,13 @@ def _email_notifications_available(user) -> bool:
     return can_email_user(user)
 
 
+def _admin_disabled_setting(key, default=False):
+    """Whether a global admin switch is on, normalising the strings
+    SystemSetting stores for boolean rows."""
+    value = SystemSetting.get_setting(key, default)
+    return value if isinstance(value, bool) else str(value).lower() == 'true'
+
+
 # --- Routes ---
 
 @auth_bp.route('/api/user/timezone', methods=['POST'])
@@ -768,6 +775,15 @@ def account():
         elif 'preferences_form' in request.form:
             current_user.show_timestamps_simple_view = 'show_timestamps_simple_view' in request.form
             current_user.editor_autosave = 'editor_autosave' in request.form
+            # Auto-translation: only when the section rendered, and only if
+            # the administrator allows it globally. The account page hides the
+            # checkbox otherwise, so an absent field must not clear a value the
+            # user set while the feature was available.
+            if 'auto_translation_shown' in request.form:
+                current_user.auto_translation = (
+                    'auto_translation' in request.form
+                    and not _admin_disabled_setting('disable_auto_translation', True)
+                )
             # Only honour the notification toggle when the form actually
             # rendered it. The checkbox is hidden when Speakr cannot mail this
             # user, and an absent checkbox must not silently clear a
@@ -986,9 +1002,9 @@ def account():
 
     password_login_disabled = sso_enabled and sso_config.get('disable_password_login', False)
 
-    # Check if admin has globally disabled auto-summarization
-    admin_setting = SystemSetting.get_setting('disable_auto_summarization', False)
-    admin_disabled_auto_summarization = admin_setting if isinstance(admin_setting, bool) else str(admin_setting).lower() == 'true'
+    # Check if admin has globally disabled auto-summarization or auto-translation
+    admin_disabled_auto_summarization = _admin_disabled_setting('disable_auto_summarization', False)
+    auto_translation_available = not _admin_disabled_setting('disable_auto_translation', True)
 
     # Get user's UI language preference
     user_language = current_user.ui_language if current_user.ui_language else 'en'
@@ -1022,6 +1038,7 @@ def account():
                            auto_speaker_labelling=current_user.auto_speaker_labelling,
                            auto_speaker_labelling_threshold=current_user.auto_speaker_labelling_threshold or 'medium',
                            admin_disabled_auto_summarization=admin_disabled_auto_summarization,
+                           auto_translation_available=auto_translation_available,
                            auto_summarization=current_user.auto_summarization if current_user.auto_summarization is not None else True,
                            inquire_allow_summaries=_inquire_availability['summaries'],
                            inquire_allow_notes=_inquire_availability['notes'],

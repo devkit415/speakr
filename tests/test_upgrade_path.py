@@ -25,7 +25,7 @@ from sqlalchemy import inspect
 
 from src.database import db
 from src.init_db import initialize_database
-from src.models import User
+from src.models import User, Recording
 
 
 FIXTURE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "schemas")
@@ -202,6 +202,33 @@ def test_no_scratch_tables_are_left_behind(upgraded):
     leftovers = {name for name in tables if name.endswith("_new")}
 
     assert not leftovers, f"migration left scratch tables behind: {sorted(leftovers)}"
+
+
+def test_recording_translation_columns_exist_after_upgrade(upgraded):
+    """The translation feature adds two nullable columns to recording; an
+    upgrade from an older schema must gain them via the column-add helper."""
+    con = sqlite3.connect(upgraded["path"])
+    columns = {row[1] for row in con.execute('PRAGMA table_info("recording")')}
+    con.close()
+
+    assert "transcription_translation" in columns
+    assert "transcription_translation_language" in columns
+
+
+def test_recording_schema_reaches_current_model(upgraded):
+    """Mirror of test_no_column_is_lost for the recording table."""
+    con = sqlite3.connect(upgraded["path"])
+    before_cols = {row[1] for row in con.execute('PRAGMA table_info("recording")')}
+    con.close()
+
+    # Re-derive the pre-upgrade column set from the fixture is not possible here,
+    # so instead assert every column of the current model is present after upgrade.
+    live_con = sqlite3.connect(upgraded["path"])
+    after_cols = {row[1] for row in live_con.execute('PRAGMA table_info("recording")')}
+    live_con.close()
+
+    expected = {column.name for column in Recording.__table__.columns}
+    assert expected - after_cols == set()
 
 
 def test_second_startup_is_a_no_op(upgraded):

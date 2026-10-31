@@ -876,7 +876,46 @@ document.addEventListener('DOMContentLoaded', async () => {
             // --- Translation view state ---
             const viewingTranslation = ref(false);
             const showTranslationModal = ref(false);
+            // Default target language resolved server-side: preferred output
+            // language, then interface language. Used when the recording has
+            // no translation yet.
+            const defaultTranslationLanguage = ref('');
             const translationTargetLanguage = ref('');
+            // (full_name, iso_code) list shared with the account page and the
+            // target-language select, read from #app's data-output-languages.
+            // Parsed up front so the tab label is localized on first render.
+            const outputLanguages = ref((() => {
+                try {
+                    return JSON.parse(document.getElementById('app')?.dataset.outputLanguages || '[]');
+                } catch (_) {
+                    return [];
+                }
+            })());
+            // Label a stored output-language name ("Spanish") in the interface
+            // language, keeping the stored value when the list does not know it.
+            // Accepts an ISO code too, for rows written before the name was
+            // canonicalized.
+            const translationLanguageLabel = (stored) => {
+                if (!stored) return '';
+                const needle = String(stored).trim().toLowerCase();
+                const entry = outputLanguages.value.find(([name, iso]) =>
+                    String(name).toLowerCase() === needle || String(iso).toLowerCase() === needle);
+                if (!entry) return stored;
+                const key = `languages.${entry[1]}`;
+                const label = t(key);
+                // A key missing from the current locale renders as itself;
+                // the stored name is a better fallback than "languages.xx".
+                return label && label !== key ? label : stored;
+            };
+            // Keep a re-run on the language already used for this recording;
+            // otherwise offer the account's preferred language.
+            const openTranslationModal = () => {
+                translationTargetLanguage.value =
+                    selectedRecording.value?.transcription_translation_language
+                    || defaultTranslationLanguage.value
+                    || '';
+                showTranslationModal.value = true;
+            };
             watch(() => selectedRecording.value?.id, () => {
                 viewingTranslation.value = false;
                 showTranslationModal.value = false;
@@ -1929,6 +1968,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 transcriptDownloadFormat, showUploadSplitMenu,
                 currentPlayingSegmentIndex, followPlayerMode, processingIndicatorMinimized,
                 viewingTranslation, showTranslationModal, translationTargetLanguage,
+                openTranslationModal, translationLanguageLabel,
 
                 // Chat
                 showChat, isChatMaximized, chatMessages, chatInput, isChatLoading, chatMessagesRef, chatInputRef,
@@ -2645,7 +2685,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (lang) body.target_language = lang;
                     const res = await fetch(`/recording/${selectedRecording.value.id}/translate_transcription`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': (typeof getCsrfToken === 'function' ? getCsrfToken() : '') },
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken.value },
                         body: JSON.stringify(body)
                     });
                     let data = {};
@@ -2654,6 +2694,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                         showTranslationModal.value = false;
                         viewingTranslation.value = true;
                         showToast(data.message || t('server.apiMessage.translationQueued'));
+                        // The translation job leaves recording.status alone, so
+                        // translationJobActive (backed by the job-queue poll) is
+                        // the only signal the UI has. Fetch it right away so the
+                        // in-progress spinner replaces the empty state without
+                        // waiting for the next poll tick, and keep polling so the
+                        // finished job's transcript refetch lands dynamically.
+                        await fetchJobQueueStatus(true);
+                        startJobQueuePolling();
                     } else {
                         showToast(data.error || data.message || t('messages.translationFailed') || 'Translation failed', 'fa-exclamation-circle');
                     }
@@ -3013,6 +3061,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (recording.summarization_duration_seconds) {
                         tooltipParts.push(`Summarization: ${formatProcessingDuration(recording.summarization_duration_seconds)}`);
                     }
+                    if (recording.translation_duration_seconds) {
+                        tooltipParts.push(`Translation: ${formatProcessingDuration(recording.translation_duration_seconds)}`);
+                    } else if (recording.transcription_translation && recording.translation_duration_seconds === null) {
+                        // NULL duration alongside an existing translation means
+                        // the source already matched the target and the text was
+                        // copied without an LLM call.
+                        tooltipParts.push('Translation: copied');
+                    }
 
                     const tooltipText = tooltipParts.length > 1 ? tooltipParts.join('\n') : null;
 
@@ -3356,6 +3412,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 // 1. First, add all backend jobs (these have the most accurate status)
                 for (const job of allJobs.value) {
+                    // A translation job is reported as queue_type 'summary' (it
+                    // shares that worker) and leaves recording.status alone, so
+                    // it would show up here labelled "Summarizing". The
+                    // translation tab renders its own spinner from
+                    // translationJobActive, so keep these jobs out of the
+                    // processing queue rather than mislabel them.
+                    if (job.job_type === 'translate_transcription') continue;
                     const key = `rec_${job.recording_id}`;
                     const existing = items.get(key);
 
@@ -3932,6 +3995,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const pos = appElement.dataset.audioPlayerPosition;
                     audioPlayerPosition.value = (pos === 'top') ? 'top' : 'bottom';
                     currentUserName.value = appElement.dataset.currentUserName || '';
+                    defaultTranslationLanguage.value = appElement.dataset.defaultTranslationLanguage || '';
+                    if (!translationTargetLanguage.value) {
+                        translationTargetLanguage.value = defaultTranslationLanguage.value;
+                    }
                 }
 
                 // Load saved transcription initial-prompt templates (#309) for

@@ -507,7 +507,8 @@
       "uploadDisclaimerDesc": "文件上传前显示的法律免责声明。支持 Markdown。留空以禁用。",
       "customBannerDesc": "页面顶部显示的自定义横幅。支持 Markdown。留空以禁用。",
       "transcriptLengthLimitDesc": "从转录发送到 LLM 进行摘要和聊天的最大字符数。使用 -1 表示无限制。",
-      "maxAudioOnlyVideoSizeDesc": "仅音频模式下视频上传的最大文件大小（MB）。仅保留提取出的音频，因此上传文件本身可以大于常规限制。"
+      "maxAudioOnlyVideoSizeDesc": "仅音频模式下视频上传的最大文件大小（MB）。仅保留提取出的音频，因此上传文件本身可以大于常规限制。",
+      "disableAutoTranslationDesc": "启用后，录音只会进行转录，用户必须手动触发翻译。禁用后，每位用户可以选择在转录完成后自动翻译新录音。"
     },
     "storageUsed": "已用存储",
     "summarizationInstructions": "摘要说明",
@@ -924,7 +925,7 @@
     "send": "发送",
     "addParticipant": "添加参与者",
     "deleteShareLink": "删除分享链接",
-    "reprocessTranslation": "Reprocess translation"
+    "reprocessTranslation": "重新处理翻译"
   },
   "changePasswordModal": {
     "confirmPassword": "确认新密码",
@@ -1696,7 +1697,7 @@
     "deleteRecording": "删除录音",
     "more": "更多操作",
     "reprocess": "重新处理",
-    "reprocessTranslation": "Reprocess translation"
+    "reprocessTranslation": "重新处理翻译"
   },
   "help": {
     "actions": "操作",
@@ -2079,10 +2080,10 @@
     "summarySaved": "摘要已保存！",
     "tagsReordered": "标签已重新排序",
     "transcriptionReprocessingStarted": "已开始重新处理转录",
-    "translationInProgress": "Translation already in progress",
-    "translationFailed": "Translation failed",
-    "noTranslationToCopy": "No transcription available to copy.",
-    "noTranslationToDownload": "No transcription available to download."
+    "translationInProgress": "翻译已在进行中",
+    "translationFailed": "翻译失败",
+    "noTranslationToCopy": "没有可复制的翻译。",
+    "noTranslationToDownload": "没有可下载的翻译。"
   },
   "metadata": {
     "cancelEdit": "取消",
@@ -2192,6 +2193,9 @@
     "storageQuotaReached": "由于存储已满（已用 {{used_mb}} MB，共 {{quota_mb}} MB），{{filename}} 仍留在监控文件夹中，有空间后会自动添加。"
   },
   "preferences": {
+    "autoTranslation": "自动翻译新录音",
+    "autoTranslationDisabled": "管理员已禁用自动翻译。",
+    "autoTranslationHelp": "启用后，每段新录音在转录完成后会自动翻译为聊天机器人和摘要的首选语言。默认关闭，此时您需要通过“生成翻译”按钮手动生成翻译。翻译消耗与手动翻译相同的 AI 令牌，并计入您的每月令牌预算。",
     "description": "显示与编辑器行为偏好。这些设置保存在您的账户中，并在所有设备上生效。",
     "editorAutosave": "自动保存转录编辑器中的修改",
     "editorAutosaveHelp": "启用后，转录编辑器中的修改会在停止输入约两秒后自动保存。默认关闭，您需要通过保存按钮或 Ctrl+S 手动保存。",
@@ -2209,7 +2213,8 @@
     "showTimestampsSimpleView": "在简单视图中显示时间戳",
     "showTimestampsSimpleViewHelp": "在简单视图中，每个发言人标签旁显示紧凑的 mm:ss 时间戳。气泡视图不受影响。",
     "transcriptDisplay": "转录显示",
-    "transcriptEditor": "转录编辑器"
+    "transcriptEditor": "转录编辑器",
+    "translation": "翻译"
   },
   "preview": {
     "placeholderLegend": "占位符图例：",
@@ -2837,9 +2842,10 @@
     "switchToBubbleView": "切换到气泡视图",
     "switchToSimpleView": "切换到简单视图",
     "tagDragToReorder": "{{name}}（拖动以重新排序）",
-    "translateTranscript": "Translate transcript",
-    "reprocessTranslation": "Reprocess translation",
-    "translateTranscriptIncognito": "Translation is unavailable for incognito recordings."
+    "translateTranscript": "翻译转录",
+    "reprocessTranslation": "重新处理翻译",
+    "translateTranscriptIncognito": "翻译不适用于无痕录音。",
+    "editTranslation": "编辑翻译"
   },
   "transcriptTemplates": {
     "availableTemplates": "可用模板",
@@ -3510,10 +3516,10 @@
       "share_permissions_required": "请发送 can_edit、can_reshare 或两者",
       "share_update_denied": "只有分享此录音的人才能更改这些权限",
       "share_source_locked": "此共享来自群组标签或文件夹，其权限由该群组决定",
-      "translation_no_transcription": "No transcription available for translation.",
-      "translation_blocked_transcription_failed": "Cannot translate: transcription failed. Please reprocess the transcription first.",
-      "translation_llm_not_configured": "Translation service is not available (LLM client not configured)",
-      "translation_invalid_language": "Unknown target language."
+      "translation_no_transcription": "没有可用于翻译的转录。",
+      "translation_blocked_transcription_failed": "无法翻译：转录失败。请先重新处理转录。",
+      "translation_llm_not_configured": "翻译服务不可用（未配置 LLM 客户端）",
+      "translation_invalid_language": "未知的目标语言。"
     },
     "apiMessage": {
       "accountUpdated": "账户信息已更新！",
@@ -3557,7 +3563,7 @@
       "userAlreadyHasNamingTemplates": "该用户已有命名模板",
       "userAlreadyHasTemplates": "该用户已有模板",
       "voiceProfileCleared": "已清除 {{name}} 的声纹档案",
-      "translationQueued": "Translation queued"
+      "translationQueued": "翻译已加入队列"
     },
     "form": {
       "required": "此字段为必填项。",
@@ -3695,13 +3701,14 @@
     "continueToLogin": "继续登录"
   },
   "translation": {
-    "title": "Translation",
-    "noTranslation": "No translation available",
-    "generate": "Generate",
-    "generateTitle": "Generate translation",
-    "targetLanguage": "Target language",
-    "preferences": "Translation preferences",
-    "toggle": "Toggle translation",
-    "incognitoUnavailable": "Translation is unavailable for incognito recordings."
+    "title": "翻译",
+    "noTranslation": "没有可用的翻译",
+    "generate": "生成翻译",
+    "generateTitle": "生成翻译",
+    "inProgress": "正在翻译...",
+    "targetLanguage": "目标语言",
+    "preferences": "翻译偏好设置",
+    "toggle": "切换翻译",
+    "incognitoUnavailable": "翻译不适用于无痕录音。"
   }
 }

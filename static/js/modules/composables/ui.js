@@ -1545,8 +1545,8 @@ export function useUI(state, utils, processedTranscription) {
     const getDisplayedTranscription = () => {
         const rec = selectedRecording.value;
         if (!rec) return '';
-        if (viewingTranslation.value && rec.transcription_translation) {
-            return rec.transcription_translation;
+        if (viewingTranslation.value) {
+            return rec.transcription_translation || '';
         }
         return rec.transcription || '';
     };
@@ -1554,7 +1554,7 @@ export function useUI(state, utils, processedTranscription) {
     const copyTranscription = (event) => {
         const displayed = getDisplayedTranscription();
         if (!selectedRecording.value || !displayed) {
-            showToast(t('messages.noTranscriptionToCopy'), 'fa-exclamation-circle');
+            showToast(t(viewingTranslation.value ? 'messages.noTranslationToCopy' : 'messages.noTranscriptionToCopy'), 'fa-exclamation-circle');
             return;
         }
 
@@ -1662,7 +1662,7 @@ export function useUI(state, utils, processedTranscription) {
     const downloadTranscript = async () => {
         const displayed = getDisplayedTranscription();
         if (!selectedRecording.value || !displayed) {
-            showToast(t('messages.noTranscriptionToDownload'), 'fa-exclamation-circle');
+            showToast(t(viewingTranslation.value ? 'messages.noTranslationToDownload' : 'messages.noTranscriptionToDownload'), 'fa-exclamation-circle');
             return;
         }
 
@@ -1791,9 +1791,10 @@ export function useUI(state, utils, processedTranscription) {
             }
 
             // Download the transcript with the selected template
+            const translationParam = viewingTranslation.value ? '&translation=1' : '';
             const url = templateId
-                ? `/recording/${selectedRecording.value.id}/download/transcript?template_id=${templateId}&format=${fmt}`
-                : `/recording/${selectedRecording.value.id}/download/transcript?format=${fmt}`;
+                ? `/recording/${selectedRecording.value.id}/download/transcript?template_id=${templateId}&format=${fmt}${translationParam}`
+                : `/recording/${selectedRecording.value.id}/download/transcript?format=${fmt}${translationParam}`;
 
             const response = await fetch(url);
             if (!response.ok) {
@@ -1824,31 +1825,17 @@ export function useUI(state, utils, processedTranscription) {
     const downloadWithDefaultTemplate = async () => {
         const displayed = getDisplayedTranscription();
         if (!selectedRecording.value || !displayed) {
-            showToast(t('messages.noTranscriptionToDownload'), 'fa-exclamation-circle');
+            showToast(t(viewingTranslation.value ? 'messages.noTranslationToDownload' : 'messages.noTranscriptionToDownload'), 'fa-exclamation-circle');
             return;
         }
 
         try {
             const fmt = transcriptDownloadFormat.value === 'md' ? 'md' : 'txt';
-            if (viewingTranslation.value) {
-                const text = getDisplayedTranscription();
-                const title = selectedRecording.value.title || 'transcript';
-                const content = fmt === 'md' ? `# ${title}\\n\\n${text}\\n` : text;
-                const mime = fmt === 'md' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8';
-                const blob = new Blob([content], { type: mime });
-                const downloadUrl = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = downloadUrl;
-                a.download = `${title}_translation.${fmt}`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(downloadUrl);
-                showToast(t('messages.transcriptDownloadSuccess'));
-                return;
-            }
-            // Download using the default template (server will use user's default)
-            const response = await fetch(`/recording/${selectedRecording.value.id}/download/transcript?format=${fmt}`);
+            // The server applies the same default template and formatting to a
+            // translation as it does to the transcription; the translation is
+            // a JSON segment list too, so formatting it in the browser would
+            // write raw JSON to the downloaded file.
+            const response = await fetch(`/recording/${selectedRecording.value.id}/download/transcript?format=${fmt}${viewingTranslation.value ? '&translation=1' : ''}`);
             if (!response.ok) {
                 throw new Error(t('messages.transcriptDownloadFailed'));
             }

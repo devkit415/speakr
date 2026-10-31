@@ -31,17 +31,18 @@ export function useTranscription(state, utils) {
     // Text Editor Modal
     // =========================================
 
+    const displayedTranscription = () => viewingTranslation.value
+        ? selectedRecording.value?.transcription_translation
+        : selectedRecording.value?.transcription;
+
     const openTranscriptionEditor = () => {
-        if (viewingTranslation.value) {
-            return;
-        }
-        if (!selectedRecording.value || !selectedRecording.value.transcription) {
-            return;
-        }
+        if (!selectedRecording.value) return;
+        const source = displayedTranscription();
+        if (!source) return;
 
         // Check if transcription is JSON (ASR format)
         try {
-            const parsed = JSON.parse(selectedRecording.value.transcription);
+            const parsed = JSON.parse(source);
             if (Array.isArray(parsed)) {
                 openAsrEditorModal();
             } else {
@@ -55,7 +56,8 @@ export function useTranscription(state, utils) {
 
     const openTextEditorModal = () => {
         if (!selectedRecording.value) return;
-        editingTranscriptionContent.value = selectedRecording.value.transcription || '';
+        const source = displayedTranscription();
+        editingTranscriptionContent.value = source || '';
         showTextEditorModal.value = true;
     };
 
@@ -90,7 +92,8 @@ export function useTranscription(state, utils) {
         pauseOuterAudioPlayer();
 
         try {
-            const segments = JSON.parse(selectedRecording.value.transcription);
+            const source = displayedTranscription();
+            const segments = JSON.parse(source);
 
             // Populate available speakers from THIS recording only
             const speakersInTranscript = [...new Set(segments.map(s => s.speaker))].sort();
@@ -483,24 +486,34 @@ export function useTranscription(state, utils) {
 
         try {
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            const payload = viewingTranslation.value
+                ? { transcription_translation: content }
+                : { transcription: content };
             const response = await fetch(`/recording/${selectedRecording.value.id}/update_transcription`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': csrfToken
                 },
-                body: JSON.stringify({ transcription: content })
+                body: JSON.stringify(payload)
             });
 
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || t('errors.updateTranscriptionFailed'));
 
             // Update recording
-            selectedRecording.value.transcription = content;
-
-            const index = recordings.value.findIndex(r => r.id === selectedRecording.value.id);
-            if (index !== -1) {
-                recordings.value[index].transcription = content;
+            if (viewingTranslation.value) {
+                selectedRecording.value.transcription_translation = content;
+                const index = recordings.value.findIndex(r => r.id === selectedRecording.value.id);
+                if (index !== -1) {
+                    recordings.value[index].transcription_translation = content;
+                }
+            } else {
+                selectedRecording.value.transcription = content;
+                const index = recordings.value.findIndex(r => r.id === selectedRecording.value.id);
+                if (index !== -1) {
+                    recordings.value[index].transcription = content;
+                }
             }
 
             showToast(t('messages.transcriptionUpdated'), 'fa-check-circle');

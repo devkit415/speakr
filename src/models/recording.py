@@ -40,11 +40,20 @@ class Recording(db.Model):
     # configuration rather than the audio. None when the backend did not
     # report one, or reported something that is not a language code.
     transcription_language = db.Column(db.String(20), nullable=True)
+    # Language the user EXPLICITLY requested for this recording's transcription,
+    # as an ISO 639-1 code. NULL means the transcription ran with auto-detect.
+    # Distinct from transcription_language above, which is what the service
+    # reported for the audio and is also set when detection was automatic. The
+    # translation job reads this to skip the LLM when the requested source
+    # language already matches the target (#translation).
+    transcription_requested_language = db.Column(db.String(20), nullable=True)
     # Translated transcript stored alongside the original (#translation). Never
     # overwrites transcription. NULL when no translation exists yet.
     transcription_translation = db.Column(db.Text, nullable=True)
     # Full language name of the translated transcript (e.g. "Spanish").
     transcription_translation_language = db.Column(db.String(50), nullable=True)
+    # Time taken for the latest translation, in wall-clock seconds (#translation).
+    translation_duration_seconds = db.Column(db.Integer, nullable=True)
     summary = db.Column(db.Text, nullable=True)
     status = db.Column(db.String(50), default='PENDING')  # PENDING, PROCESSING, SUMMARIZING, COMPLETED, FAILED
     audio_path = db.Column(db.String(500))
@@ -534,8 +543,10 @@ class Recording(db.Model):
             'notes': user_notes,
             'transcription': self.transcription,
             'transcription_language': self.transcription_language,
+            'transcription_requested_language': self.transcription_requested_language,
             'transcription_translation': self.transcription_translation,
             'transcription_translation_language': self.transcription_translation_language,
+            'translation_duration_seconds': self.translation_duration_seconds,
             'summary': self.summary,
             'status': self.status,
             'created_at': self.created_at.isoformat() if self.created_at else None,

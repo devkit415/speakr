@@ -234,8 +234,8 @@ TEXT_MODEL_CONFIGURED = bool(TEXT_MODEL_API_KEY) or bool(os.environ.get("TEXT_MO
 # dedicated translation model has its own key or server address.
 TRANSLATION_MODEL_CONFIGURED = (
     TEXT_MODEL_CONFIGURED
-    or bool(TRANSLATION_MODEL_API_KEY)
-    or bool(os.environ.get("TRANSLATION_MODEL_BASE_URL", "").split('#')[0].strip())
+    or (bool(TRANSLATION_MODEL_NAME) and (bool(TRANSLATION_MODEL_API_KEY)
+        or bool(os.environ.get("TRANSLATION_MODEL_BASE_URL", "").split('#')[0].strip())))
 )
 
 try:
@@ -647,6 +647,137 @@ def call_chat_completion(messages, temperature=0.7, response_format=None, stream
     except Exception as e:
         logger.error(f"Chat LLM API call failed: {e}")
         _log_rejected_parameters(e, chat_config['extra_body_variable'], chat_config['extra_body'])
+        raise
+
+
+def call_translation_completion(messages, temperature=0.7, response_format=None, stream=False, max_tokens=None,
+                            user_id=None, operation_type=None):
+    """
+    Translation-specific LLM completion function. Uses dedicated translation
+    model if configured, otherwise falls back to standard TEXT_MODEL
+    configuration.
+
+    Args:
+        messages: List of message dicts with 'role' and 'content'
+        temperature: Sampling temperature (0-1) - ignored for GPT-5 models
+        response_format: Optional response format dict (e.g., {"type": "json_object"})
+        stream: Whether to stream the response
+        max_tokens: Optional maximum tokens to generate
+        user_id: Optional user ID for token tracking and budget enforcement
+        operation_type: Optional operation type for token tracking (e.g., 'translation')
+
+    Returns:
+        OpenAI completion object or generator (if streaming)
+    """
+    effective_client = translation_client if translation_client else client
+    translation_config = get_translation_config()
+
+    if not effective_client:
+        raise ValueError("Translation LLM client not initialized")
+
+    # Check budget before making the call
+    if user_id and operation_type:
+        try:
+            from src.services.token_tracking import token_tracker
+            can_proceed, usage_pct, msg = token_tracker.check_budget(user_id)
+            if not can_proceed:
+                raise TokenBudgetExceeded(msg, usage_pct)
+            if usage_pct >= 80:
+                logger.warning(f"User {user_id} at {usage_pct:.1f}% of token budget")
+        except TokenBudgetExceeded:
+            raise
+        except Exception as e:
+            # Log but don't block on budget check errors
+            logger.warning(f"Budget check failed for user {user_id}: {e}")
+
+    try:
+        model_name = translation_config['model_name']
+        base_url = translation_config['base_url'] or ''
+
+        # Check if we're using GPT-5 with OpenAI API (or forced via env for
+        # Azure AI Foundry and other gateways the URL check can't detect)
+        using_gpt5 = translation_config['gpt5_force'] or (is_gpt5_model(model_name) and 'api.openai.com' in base_url)
+
+        completion_args = {
+            "model": model_name,
+            "messages": messages,
+            "stream": stream
+        }
+
+        # Add stream_options to get usage in final chunk for streaming
+        # Some LLM servers don't support this OpenAI-specific option
+        if stream and ENABLE_STREAM_OPTIONS:
+            completion_args["stream_options"] = {"include_usage": True}
+
+        if using_gpt5:
+            logger.debug(f"Using GPT-5 translation model: {model_name}")
+            completion_args["reasoning_effort"] = translation_config['gpt5_reasoning_effort']
+            completion_args["verbosity"] = translation_config['gpt5_verbosity']
+
+            if max_tokens:
+                completion_args["max_completion_tokens"] = max_tokens
+        else:
+            completion_args["temperature"] = temperature
+            if max_tokens:
+                completion_args["max_tokens"] = max_tokens
+
+        if response_format:
+            completion_args["response_format"] = response_format
+
+        _add_extra_body(completion_args, translation_config['extra_body'], translation_config['extra_body_error'])
+
+        budget_key = 'max_completion_tokens' if using_gpt5 else 'max_tokens'
+        logger.info(
+            f"Translation LLM call: operation={operation_type or 'unspecified'}, model={model_name}, "
+            f"{budget_key}={completion_args.get(budget_key, 'provider default')}"
+        )
+
+        request_started_at = time.monotonic()
+        response = effective_client.chat.completions.create(**completion_args)
+
+        # Track usage for non-streaming calls
+        if user_id and operation_type and not stream and response.usage:
+            try:
+                from src.services.token_tracking import token_tracker
+                cached_tokens, cache_write_tokens = extract_cache_tokens(response.usage)
+                token_tracker.record_usage(
+                    user_id=user_id,
+                    operation_type=operation_type,
+                    prompt_tokens=response.usage.prompt_tokens,
+                    completion_tokens=response.usage.completion_tokens,
+                    total_tokens=response.usage.total_tokens,
+                    model_name=model_name,
+                    cost=getattr(response.usage, 'cost', None),
+                    cached_tokens=cached_tokens,
+                    cache_write_tokens=cache_write_tokens
+                )
+            except Exception as e:
+                logger.warning(f"Failed to record token usage: {e}")
+
+        # Debug log for empty responses
+        if not stream and response.choices:
+            content = response.choices[0].message.content
+            if not content:
+                logger.warning(f"Translation LLM returned empty content. Model: {model_name}, finish_reason: {response.choices[0].finish_reason}")
+
+        return response
+
+    except TokenBudgetExceeded:
+        raise
+    except APITimeoutError as e:
+        elapsed = time.monotonic() - request_started_at if 'request_started_at' in locals() else None
+        elapsed_str = f"{elapsed:.1f}s" if elapsed is not None else "unknown"
+        logger.error(
+            f"Translation LLM request timed out after {elapsed_str} (configured read_timeout={LLM_REQUEST_TIMEOUT}s, "
+            f"max_retries={LLM_MAX_RETRIES}, model={model_name}). "
+            f"If the elapsed time is much shorter than the configured timeout, an upstream proxy or the "
+            f"provider is closing the connection early. For reasoning models that take longer to think, "
+            f"increase LLM_REQUEST_TIMEOUT."
+        )
+        raise
+    except Exception as e:
+        logger.error(f"Translation LLM API call failed: {e}")
+        _log_rejected_parameters(e, translation_config['extra_body_variable'], translation_config['extra_body'])
         raise
 
 

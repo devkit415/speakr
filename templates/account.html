@@ -1149,7 +1149,7 @@
                                         <select name="output_language" id="output_language" class="mt-1 block w-full px-3 py-2 border border-[var(--border-secondary)] rounded-md shadow-sm focus:outline-none focus:ring-[var(--border-focus)] focus:border-[var(--border-focus)] sm:text-sm bg-[var(--bg-input)] text-[var(--text-primary)]">
                                             <option value="" data-sort-pin="top" data-i18n="languages.defaultModelDecides" {% if not current_user.output_language %}selected{% endif %}>Default (model decides)</option>
                                             {% for _lang_name, _lang_code in output_languages %}
-                                            <option value="{{ _lang_name }}" data-i18n=languages.{{ _lang_code }} {% if current_user.output_language == _lang_name %}selected{% endif %}>{{ _lang_name }}</option>
+                                            <option value="{{ _lang_name }}" data-i18n="languages.{{ _lang_code }}" {% if current_user.output_language == _lang_name %}selected{% endif %}>{{ _lang_name }}</option>
                                             {% endfor %}
                                         </select>
                                         <p class="text-xs text-[var(--text-light)] mt-1" data-i18n="account.languageForSummaries">Language for titles, summaries, and chat. Leave on Default to follow the model's own behaviour.</p>
@@ -1232,6 +1232,20 @@
                                         <span class="block text-xs text-[var(--text-muted)] mt-0.5" data-i18n="preferences.editorAutosaveHelp">When enabled, edits in the transcript editor are saved automatically a couple of seconds after you stop typing. When disabled (default), you save explicitly via the Save buttons or <code>Ctrl+S</code>.</span>
                                     </span>
                                 </label>
+
+                                <h3 class="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wide pt-4" data-i18n="preferences.translation">Translation</h3>
+                                {% if auto_translation_available %}
+                                <input type="hidden" name="auto_translation_shown" value="1">
+                                <label class="flex items-start gap-3 p-3 bg-[var(--bg-tertiary)] border border-[var(--border-secondary)] rounded-md cursor-pointer hover:bg-[var(--bg-accent-hover)]">
+                                    <input type="checkbox" id="prefAutoTranslation" name="auto_translation" {% if current_user.auto_translation %}checked{% endif %} class="mt-1 h-4 w-4 text-[var(--text-accent)] border-[var(--border-secondary)] rounded focus:ring-[var(--border-focus)] bg-[var(--bg-input)]">
+                                    <span class="flex-1">
+                                        <span class="block text-sm font-medium text-[var(--text-primary)]" data-i18n="preferences.autoTranslation">Auto-translate new recordings</span>
+                                        <span class="block text-xs text-[var(--text-muted)] mt-0.5" data-i18n="preferences.autoTranslationHelp">When enabled, each new recording is translated automatically into the language you selected as your Preferred Chatbot and Summarization Language once transcription finishes. When disabled (default), you generate the translation yourself with the Generate Translation button. Translations use the same AI tokens as a manual one and count toward your monthly token budget.</span>
+                                    </span>
+                                </label>
+                                {% else %}
+                                <p class="text-xs text-[var(--text-muted)] italic" data-i18n="preferences.autoTranslationDisabled">Auto-translation is disabled by the administrator.</p>
+                                {% endif %}
 
                                 <!-- Audio player position (was the Display
                                      tab; merged here because the only thing

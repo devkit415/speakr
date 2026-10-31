@@ -99,6 +99,8 @@
          data-enable-internal-sharing="{{ enable_internal_sharing }}"
          data-current-user-name="{{ (current_user.name or current_user.username) if current_user.is_authenticated else '' }}"
          data-user-language="{{ user_language }}"
+         data-default-translation-language="{{ default_translation_language }}"
+         data-output-languages='{{ output_languages|tojson }}'
          data-show-timestamps-simple-view="{{ 'True' if (current_user.is_authenticated and current_user.show_timestamps_simple_view) else 'False' }}"
          data-editor-autosave="{{ 'True' if (current_user.is_authenticated and current_user.editor_autosave) else 'False' }}"
          data-audio-player-position="{{ (current_user.audio_player_position or 'bottom') if current_user.is_authenticated else 'bottom' }}"

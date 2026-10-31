@@ -507,7 +507,8 @@
       "uploadDisclaimerDesc": "Legal disclaimer shown before file uploads. Supports Markdown. Leave empty to disable.",
       "customBannerDesc": "Custom banner shown at the top of the page. Supports Markdown. Leave empty to disable.",
       "transcriptLengthLimitDesc": "Maximum number of characters to send from transcript to LLM for summarization and chat. Use -1 for no limit.",
-      "maxAudioOnlyVideoSizeDesc": "Maximum file size (in MB) for video uploads in audio-only mode. Only the extracted audio is stored, so the upload itself can be larger than the regular file-size limit."
+      "maxAudioOnlyVideoSizeDesc": "Maximum file size (in MB) for video uploads in audio-only mode. Only the extracted audio is stored, so the upload itself can be larger than the regular file-size limit.",
+      "disableAutoTranslationDesc": "When enabled, recordings are only transcribed and users must trigger translation manually. When disabled, each user can opt in to auto-translate new recordings after transcription."
     },
     "storageUsed": "STORAGE USED",
     "summarizationInstructions": "Summarization Instructions",
@@ -2192,6 +2193,9 @@
     "storageQuotaReached": "{{filename}} was left in the watch folder because your storage is full ({{used_mb}} MB of {{quota_mb}} MB). It is added once there is room."
   },
   "preferences": {
+    "autoTranslation": "Auto-translate new recordings",
+    "autoTranslationDisabled": "Auto-translation is disabled by the administrator.",
+    "autoTranslationHelp": "When enabled, each new recording is translated automatically into the language you selected as your Preferred Chatbot and Summarization Language once transcription finishes. When disabled (default), you generate the translation yourself with the Generate Translation button. Translations use the same AI tokens as a manual one and count toward your monthly token budget.",
     "description": "Display and editor behaviour preferences. These settings are saved to your account and apply across devices.",
     "editorAutosave": "Auto-save edits in the transcript editor",
     "editorAutosaveHelp": "When enabled, edits in the transcript editor are saved automatically a couple of seconds after you stop typing. When disabled (default), you save explicitly via the Save buttons or Ctrl+S.",
@@ -2209,7 +2213,8 @@
     "showTimestampsSimpleView": "Show timestamps in simple view",
     "showTimestampsSimpleViewHelp": "Display a compact mm:ss timestamp next to each speaker label in the simple transcript view. The bubble view is unaffected.",
     "transcriptDisplay": "Transcript display",
-    "transcriptEditor": "Transcript editor"
+    "transcriptEditor": "Transcript editor",
+    "translation": "Translation"
   },
   "preview": {
     "placeholderLegend": "Placeholder legend:",
@@ -2839,7 +2844,8 @@
     "tagDragToReorder": "{{name}} (drag to reorder)",
     "translateTranscript": "Translate transcript",
     "reprocessTranslation": "Reprocess translation",
-    "translateTranscriptIncognito": "Translation is unavailable for incognito recordings."
+    "translateTranscriptIncognito": "Translation is unavailable for incognito recordings.",
+    "editTranslation": "Edit translation"
   },
   "transcriptTemplates": {
     "availableTemplates": "Available Templates",
@@ -3697,8 +3703,9 @@
   "translation": {
     "title": "Translation",
     "noTranslation": "No translation available",
-    "generate": "Generate",
+    "generate": "Generate Translation",
     "generateTitle": "Generate translation",
+    "inProgress": "Translation in progress...",
     "targetLanguage": "Target language",
     "preferences": "Translation preferences",
     "toggle": "Toggle translation",

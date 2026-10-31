@@ -72,10 +72,14 @@ def _referenced_keys():
         text = open(path, encoding='utf-8').read()
         # Vue templates and inline scripts call t() as the JS does.
         for key in TEMPLATE_PATTERN.findall(text) + JS_PATTERN.findall(text):
+            if '{{' in key or '{%' in key:
+                continue
             found.setdefault(key, set()).add(os.path.relpath(path, REPO))
     for path in _walk('static/js', '.js', skip=('.test.js',)):
         text = open(path, encoding='utf-8').read()
         for key in JS_PATTERN.findall(text):
+            if '{{' in key or '{%' in key:
+                continue
             found.setdefault(key, set()).add(os.path.relpath(path, REPO))
     return found
 

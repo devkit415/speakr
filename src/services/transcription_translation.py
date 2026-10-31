@@ -6,10 +6,8 @@ result on a recording without touching the original transcription.
 """
 
 import json
-import os
 import re
-
-from flask import current_app
+import time
 
 
 def _transcript_limit():
@@ -79,10 +77,10 @@ def _safe_json_loads(text, fallback=None):
 
 
 def _call_llm(messages, user_id, prefix_opt):
-    from src.services.llm import call_llm_completion
+    from src.services.llm import call_translation_completion
 
     flag, _system, _prefix = prefix_opt
-    completion = call_llm_completion(
+    completion = call_translation_completion(
         messages=messages,
         temperature=0.2,
         response_format={'type': 'json_object'},
@@ -158,7 +156,7 @@ def translate_json_segments(text, user_id, target_language):
         return translate_plain_text(text, user_id, target_language)
 
     # Detect whether this is actually a segment list.
-    is_segments = all(isinstance(item, dict) and 'sentence' in item for item in data) if data else False
+    is_segments = all(isinstance(item, dict) and 'sentence' in item for item in data)
     if not is_segments:
         # Could be a JSON array of strings; treat as plain text.
         return translate_plain_text(text, user_id, target_language)
@@ -184,10 +182,17 @@ def translate_json_segments(text, user_id, target_language):
     prefix_opt = _prefix_cache_parts()
     translated_all = []
     for chunk in chunks:
-        payload = {str(i + 1): (chunk[i] if chunk[i] is not None else '') for i in range(len(chunk))}
-        parsed = _llm_translate_payload(payload, user_id, target_language, prefix_opt)
+        non_empty = [i for i, s in enumerate(chunk) if (s or '').strip()]
+        payload = {str(i + 1): (chunk[i] if chunk[i] is not None else '') for i in non_empty}
+        parsed = _llm_translate_payload(payload, user_id, target_language, prefix_opt) if payload else {}
         for i in range(len(chunk)):
-            translated_all.append(parsed[str(i + 1)])
+            if i in non_empty:
+                value = parsed.get(str(i + 1)) if isinstance(parsed, dict) else None
+                if not isinstance(value, str):
+                    raise ValueError('Malformed translation response: missing translation')
+                translated_all.append(value)
+            else:
+                translated_all.append(chunk[i] if chunk[i] is not None else '')
 
     new_data = []
     for idx, item in enumerate(data):
@@ -238,40 +243,89 @@ def translate_plain_text(text, user_id, target_language):
         if not chunk_text.strip():
             translated_chunks.append(chunk_text)
             continue
-        payload = {'translation': chunk_text}
-        parsed = _llm_translate_payload(payload, user_id, target_language, prefix_opt)
-        translated = None
-        if isinstance(parsed, dict):
-            for key in ('translation', 'text', 'translated_text', 'result'):
-                if key in parsed and isinstance(parsed[key], str):
-                    translated = parsed[key]
-                    break
-            if translated is None and len(parsed) == 1:
-                only = next(iter(parsed.values()))
-                if isinstance(only, str):
-                    translated = only
-        if not isinstance(translated, str):
-            raise ValueError('Malformed translation response: missing translation')
-        translated_chunks.append(translated)
+        # Translate each paragraph independently so the paragraph separators
+        # are preserved verbatim instead of depending on the model keeping them.
+        paras = [para for para, _ in chunk]
+        seps = [sep for _, sep in chunk]
+        # Only send non-empty paragraphs; empty ones are kept verbatim so a
+        # model that omits an empty key cannot fail an otherwise valid chunk.
+        non_empty = [i for i, p in enumerate(paras) if (p or '').strip()]
+        payload = {str(i): paras[i] for i in non_empty}
+        parsed = _llm_translate_payload(payload, user_id, target_language, prefix_opt) if payload else {}
+        translated_paras = []
+        for i in range(len(paras)):
+            if i in non_empty:
+                value = parsed.get(str(i)) if isinstance(parsed, dict) else None
+                if not isinstance(value, str):
+                    raise ValueError('Malformed translation response: missing translation')
+                translated_paras.append(value)
+            else:
+                translated_paras.append(paras[i] if paras[i] is not None else '')
+        translated_chunk = ''.join(translated_paras[i] + seps[i] for i in range(len(paras)))
+        translated_chunks.append(translated_chunk)
 
     return ''.join(translated_chunks)
 
 
-def translate_transcription_text(text, user_id=None, target_language=None):
-    """Pure function: translate stored transcript text, return translated text."""
+def _language_key(value):
+    """Normalise a language name or code to a comparable key, or None."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        from src.utils.language import normalize_language_code
+
+        code = normalize_language_code(text)
+        if code:
+            return code
+    except Exception:
+        pass
+    return text.lower()
+
+
+def _same_language(source_language, target_language):
+    """True when both values describe the same language.
+
+    Only an explicitly requested source language counts. None means the
+    transcription ran with auto-detect, so the source is unknown and the text
+    must go to the LLM.
+    """
+    if not source_language or not target_language:
+        return False
+    return _language_key(source_language) == _language_key(target_language)
+
+
+def translate_transcription_text(text, user_id=None, target_language=None, source_language=None):
+    """Pure function: translate stored transcript text, return translated text.
+
+    When the transcription was created with an explicitly requested language
+    and the target language is the same one, the text is copied verbatim: the
+    LLM call would only burn tokens to return the input unchanged. Recordings
+    transcribed with auto-detect always go through the LLM, because their
+    source language is not known for certain.
+    """
     if text is None:
         return ''
     target_language = _resolve_target_language(user_id, target_language)
     if not target_language:
         target_language = 'English'
 
+    if _same_language(source_language, target_language):
+        return text if isinstance(text, str) else ''
+
     stripped = text.strip() if isinstance(text, str) else ''
     if stripped.startswith('['):
         try:
-            json.loads(stripped)
+            parsed = json.loads(stripped)
+        except (json.JSONDecodeError, TypeError):
+            parsed = None
+        if isinstance(parsed, list):
+            # Do not catch a malformed-model ValueError here: translating the
+            # raw JSON string as plain text would persist a mangled result
+            # instead of letting the job retry the chunk.
             return translate_json_segments(text, user_id, target_language)
-        except (json.JSONDecodeError, ValueError, TypeError):
-            pass
     return translate_plain_text(text, user_id, target_language)
 
 
@@ -284,6 +338,7 @@ def translate_transcription(*args, **kwargs):
     text = None
     user_id = kwargs.get('user_id', kwargs.get('userId'))
     target_language = kwargs.get('target_language', kwargs.get('targetLanguage', kwargs.get('language')))
+    source_language = kwargs.get('source_language', kwargs.get('sourceLanguage'))
     recording = None
     params = kwargs.get('params')
 
@@ -308,6 +363,8 @@ def translate_transcription(*args, **kwargs):
             user_id = params.get('user_id', params.get('userId'))
         if target_language is None:
             target_language = params.get('target_language', params.get('targetLanguage', params.get('language')))
+        if source_language is None:
+            source_language = params.get('source_language', params.get('sourceLanguage'))
 
     if recording is not None:
         text = getattr(recording, 'transcription', None)
@@ -315,14 +372,28 @@ def translate_transcription(*args, **kwargs):
             user_id = getattr(recording, 'user_id', None)
         if target_language is None:
             target_language = _resolve_target_language(user_id, None)
+        if source_language is None:
+            # NULL means auto-detect, which must still go through the LLM.
+            source_language = getattr(recording, 'transcription_requested_language', None)
 
         if not text:
             raise ValueError('No transcription to translate')
 
-        translated = translate_transcription_text(text, user_id, target_language)
+        translation_start_time = time.time()
+        copied_verbatim = _same_language(source_language, target_language or 'English')
+        translated = translate_transcription_text(
+            text, user_id, target_language, source_language=source_language)
 
         recording.transcription_translation = translated
         recording.transcription_translation_language = target_language
+        # NULL means the LLM was skipped because source and target matched:
+        # there is no translation time to report. A numeric value, including a
+        # real translation rounded down to 0, means the model ran.
+        if copied_verbatim:
+            recording.translation_duration_seconds = None
+        else:
+            recording.translation_duration_seconds = max(
+                0, int(round(time.time() - translation_start_time)))
         try:
             from src.database import db
 
@@ -341,44 +412,5 @@ def translate_transcription(*args, **kwargs):
     if target_language is None:
         target_language = _resolve_target_language(user_id, None)
 
-    return translate_transcription_text(text, user_id, target_language)
-
-
-def translate_transcription_task(app_context, recording_id, user_id=None, target_language=None, params=None, **kwargs):
-    """Task-style wrapper used by the job queue."""
-    from src.database import db
-    from src.models import Recording
-
-    with app_context:
-        recording = db.session.get(Recording, recording_id)
-        if recording is None:
-            raise ValueError(f'Recording {recording_id} not found')
-
-        uid = user_id
-        lang = target_language
-        if isinstance(params, dict):
-            if uid is None:
-                uid = params.get('user_id', params.get('userId'))
-            if lang is None:
-                lang = params.get('target_language', params.get('targetLanguage', params.get('language')))
-        if uid is None:
-            uid = getattr(recording, 'user_id', None)
-        if lang is None:
-            lang = _resolve_target_language(uid, None)
-        if not lang:
-            lang = 'English'
-
-        return translate_transcription(recording, user_id=uid, target_language=lang)
-
-
-# Aliases for compatibility with various expected names.
-translate_text = translate_transcription_text
-translate_transcript = translate_transcription_text
-translate = translate_transcription_text
-run_translation = translate_transcription
-run_translation_job = translate_transcription
-translation_job = translate_transcription
-run_translation_task = translate_transcription_task
-translate_job = translate_transcription
-job_wrapper = translate_transcription_task
-pure_translate = translate_transcription_text
+    return translate_transcription_text(
+        text, user_id, target_language, source_language=source_language)

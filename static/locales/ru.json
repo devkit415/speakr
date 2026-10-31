@@ -507,7 +507,8 @@
       "uploadDisclaimerDesc": "Юридическое предупреждение, показываемое перед загрузкой файлов. Поддерживает Markdown. Оставьте пустым, чтобы отключить.",
       "customBannerDesc": "Пользовательский баннер в верхней части страницы. Поддерживает Markdown. Оставьте пустым, чтобы отключить.",
       "transcriptLengthLimitDesc": "Максимальное количество символов транскрипта для отправки в LLM для резюмирования и чата. Используйте -1 для отсутствия ограничений.",
-      "maxAudioOnlyVideoSizeDesc": "Максимальный размер (в МБ) для загрузки видео в режиме только-аудио. Сохраняется только извлечённый звук, поэтому сама загрузка может превышать обычный лимит."
+      "maxAudioOnlyVideoSizeDesc": "Максимальный размер (в МБ) для загрузки видео в режиме только-аудио. Сохраняется только извлечённый звук, поэтому сама загрузка может превышать обычный лимит.",
+      "disableAutoTranslationDesc": "Когда включено, записи только транскрибируются, а перевод пользователи запускают вручную. Когда выключено, каждый пользователь может включить автоматический перевод новых записей после транскрипции."
     },
     "storageUsed": "ИСПОЛЬЗОВАНО ХРАНИЛИЩА",
     "summarizationInstructions": "Инструкции для резюмирования",
@@ -924,7 +925,7 @@
     "send": "Отправить",
     "addParticipant": "Добавить участника",
     "deleteShareLink": "Удалить ссылку",
-    "reprocessTranslation": "Reprocess translation"
+    "reprocessTranslation": "Повторно обработать перевод"
   },
   "changePasswordModal": {
     "confirmPassword": "Подтвердите новый пароль",
@@ -1696,7 +1697,7 @@
     "deleteRecording": "Удалить запись",
     "more": "Другие действия",
     "reprocess": "Обработать заново",
-    "reprocessTranslation": "Reprocess translation"
+    "reprocessTranslation": "Повторно обработать перевод"
   },
   "help": {
     "actions": "Действия",
@@ -2079,10 +2080,10 @@
     "summarySaved": "Резюме сохранено!",
     "tagsReordered": "Порядок тегов изменён",
     "transcriptionReprocessingStarted": "Повторная обработка транскрипции запущена",
-    "translationInProgress": "Translation already in progress",
-    "translationFailed": "Translation failed",
-    "noTranslationToCopy": "No transcription available to copy.",
-    "noTranslationToDownload": "No transcription available to download."
+    "translationInProgress": "Перевод уже выполняется",
+    "translationFailed": "Не удалось выполнить перевод",
+    "noTranslationToCopy": "Нет перевода для копирования.",
+    "noTranslationToDownload": "Нет перевода для скачивания."
   },
   "metadata": {
     "cancelEdit": "Отмена",
@@ -2192,6 +2193,9 @@
     "storageQuotaReached": "{{filename}} оставлен в папке наблюдения, потому что хранилище заполнено ({{used_mb}} МБ из {{quota_mb}} МБ). Файл будет добавлен, когда появится место."
   },
   "preferences": {
+    "autoTranslation": "Автоматически переводить новые записи",
+    "autoTranslationDisabled": "Автоматический перевод отключён администратором.",
+    "autoTranslationHelp": "Когда включено, каждая новая запись автоматически переводится на предпочитаемый язык чат-бота и резюмирования после завершения транскрипции. По умолчанию выключено: перевод создаётся вручную кнопкой «Создать перевод». Переводы расходуют те же токены ИИ, что и ручной перевод, и учитываются в вашем месячном бюджете токенов.",
     "description": "Настройки отображения и поведения редактора. Эти параметры сохраняются в вашей учётной записи и применяются на всех устройствах.",
     "editorAutosave": "Автосохранение в редакторе транскрипции",
     "editorAutosaveHelp": "Когда включено, правки в редакторе транскрипции сохраняются автоматически через пару секунд после остановки ввода. По умолчанию выключено: сохранение явное через кнопки Сохранить или Ctrl+S.",
@@ -2209,7 +2213,8 @@
     "showTimestampsSimpleView": "Показывать временные метки в простом виде",
     "showTimestampsSimpleViewHelp": "Показывает компактную временную метку mm:ss рядом с именем каждого говорящего в простом виде. На пузырьковый вид не влияет.",
     "transcriptDisplay": "Отображение транскрипции",
-    "transcriptEditor": "Редактор транскрипции"
+    "transcriptEditor": "Редактор транскрипции",
+    "translation": "Перевод"
   },
   "preview": {
     "placeholderLegend": "Обозначения подстановок:",
@@ -2837,9 +2842,10 @@
     "switchToBubbleView": "Переключить на вид «пузыри»",
     "switchToSimpleView": "Переключить на простой вид",
     "tagDragToReorder": "{{name}} (перетащите, чтобы изменить порядок)",
-    "translateTranscript": "Translate transcript",
-    "reprocessTranslation": "Reprocess translation",
-    "translateTranscriptIncognito": "Translation is unavailable for incognito recordings."
+    "translateTranscript": "Перевести транскрипт",
+    "reprocessTranslation": "Повторно обработать перевод",
+    "translateTranscriptIncognito": "Перевод недоступен для инкогнито-записей.",
+    "editTranslation": "Редактировать перевод"
   },
   "transcriptTemplates": {
     "availableTemplates": "Доступные шаблоны",
@@ -3510,10 +3516,10 @@
       "share_permissions_required": "Укажите can_edit, can_reshare или оба",
       "share_update_denied": "Изменить эти права может только тот, кто поделился этой записью",
       "share_source_locked": "Этот доступ выдан через тег или папку группы, и его права определяются этой группой",
-      "translation_no_transcription": "No transcription available for translation.",
-      "translation_blocked_transcription_failed": "Cannot translate: transcription failed. Please reprocess the transcription first.",
-      "translation_llm_not_configured": "Translation service is not available (LLM client not configured)",
-      "translation_invalid_language": "Unknown target language."
+      "translation_no_transcription": "Нет транскрипции для перевода.",
+      "translation_blocked_transcription_failed": "Невозможно перевести: транскрипция завершилась ошибкой. Сначала повторно обработайте транскрипцию.",
+      "translation_llm_not_configured": "Сервис перевода недоступен (клиент LLM не настроен)",
+      "translation_invalid_language": "Неизвестный целевой язык."
     },
     "apiMessage": {
       "accountUpdated": "Данные учётной записи обновлены!",
@@ -3557,7 +3563,7 @@
       "userAlreadyHasNamingTemplates": "У пользователя уже есть шаблоны именования",
       "userAlreadyHasTemplates": "У пользователя уже есть шаблоны",
       "voiceProfileCleared": "Голосовой профиль {{name}} очищен",
-      "translationQueued": "Translation queued"
+      "translationQueued": "Перевод в очереди"
     },
     "form": {
       "required": "Это поле обязательно.",
@@ -3695,13 +3701,14 @@
     "continueToLogin": "Перейти ко входу"
   },
   "translation": {
-    "title": "Translation",
-    "noTranslation": "No translation available",
-    "generate": "Generate",
-    "generateTitle": "Generate translation",
-    "targetLanguage": "Target language",
-    "preferences": "Translation preferences",
-    "toggle": "Toggle translation",
-    "incognitoUnavailable": "Translation is unavailable for incognito recordings."
+    "title": "Перевод",
+    "noTranslation": "Нет доступного перевода",
+    "generate": "Создать перевод",
+    "generateTitle": "Создать перевод",
+    "inProgress": "Перевод выполняется...",
+    "targetLanguage": "Целевой язык",
+    "preferences": "Настройки перевода",
+    "toggle": "Показать или скрыть перевод",
+    "incognitoUnavailable": "Перевод недоступен для инкогнито-записей."
   }
 }

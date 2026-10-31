@@ -507,7 +507,8 @@
       "uploadDisclaimerDesc": "Rechtlicher Hinweis, der vor dem Hochladen von Dateien angezeigt wird. Unterstützt Markdown. Leer lassen zum Deaktivieren.",
       "customBannerDesc": "Benutzerdefiniertes Banner oben auf der Seite. Unterstützt Markdown. Leer lassen zum Deaktivieren.",
       "transcriptLengthLimitDesc": "Maximale Anzahl von Zeichen, die vom Transkript an das LLM für Zusammenfassung und Chat gesendet werden. Verwenden Sie -1 für kein Limit.",
-      "maxAudioOnlyVideoSizeDesc": "Maximale Dateigröße (in MB) für Video-Uploads im Nur-Audio-Modus. Nur das extrahierte Audio wird gespeichert, daher kann der Upload selbst größer als das normale Limit sein."
+      "maxAudioOnlyVideoSizeDesc": "Maximale Dateigröße (in MB) für Video-Uploads im Nur-Audio-Modus. Nur das extrahierte Audio wird gespeichert, daher kann der Upload selbst größer als das normale Limit sein.",
+      "disableAutoTranslationDesc": "Wenn aktiviert, werden Aufnahmen nur transkribiert und Benutzer müssen die Übersetzung manuell auslösen. Wenn deaktiviert, kann jeder Benutzer neue Aufnahmen nach der Transkription automatisch übersetzen lassen."
     },
     "storageUsed": "GENUTZTER SPEICHER",
     "summarizationInstructions": "Zusammenfassungsanweisungen",
@@ -924,7 +925,7 @@
     "send": "Senden",
     "addParticipant": "Teilnehmer hinzufügen",
     "deleteShareLink": "Freigabelink löschen",
-    "reprocessTranslation": "Reprocess translation"
+    "reprocessTranslation": "Übersetzung neu verarbeiten"
   },
   "changePasswordModal": {
     "confirmPassword": "Neues Passwort Bestätigen",
@@ -1696,7 +1697,7 @@
     "deleteRecording": "Aufnahme löschen",
     "more": "Weitere Aktionen",
     "reprocess": "Neu verarbeiten",
-    "reprocessTranslation": "Reprocess translation"
+    "reprocessTranslation": "Übersetzung neu verarbeiten"
   },
   "help": {
     "actions": "Aktionen",
@@ -2079,10 +2080,10 @@
     "summarySaved": "Zusammenfassung gespeichert!",
     "tagsReordered": "Tags neu angeordnet",
     "transcriptionReprocessingStarted": "Erneute Verarbeitung der Transkription gestartet",
-    "translationInProgress": "Translation already in progress",
-    "translationFailed": "Translation failed",
-    "noTranslationToCopy": "No transcription available to copy.",
-    "noTranslationToDownload": "No transcription available to download."
+    "translationInProgress": "Übersetzung wird bereits durchgeführt",
+    "translationFailed": "Übersetzung fehlgeschlagen",
+    "noTranslationToCopy": "Keine Übersetzung zum Kopieren verfügbar.",
+    "noTranslationToDownload": "Keine Übersetzung zum Herunterladen verfügbar."
   },
   "metadata": {
     "cancelEdit": "Abbrechen",
@@ -2192,6 +2193,9 @@
     "storageQuotaReached": "{{filename}} wurde im überwachten Ordner belassen, weil Ihr Speicher voll ist ({{used_mb}} MB von {{quota_mb}} MB). Die Datei wird hinzugefügt, sobald Platz ist."
   },
   "preferences": {
+    "autoTranslation": "Neue Aufnahmen automatisch übersetzen",
+    "autoTranslationDisabled": "Die automatische Übersetzung wurde vom Administrator deaktiviert.",
+    "autoTranslationHelp": "Wenn aktiviert, wird jede neue Aufnahme nach Abschluss der Transkription automatisch in Ihre bevorzugte Sprache für Chatbot und Zusammenfassungen übersetzt. Standardmäßig deaktiviert; Sie erstellen die Übersetzung dann selbst über die Schaltfläche Übersetzung generieren. Übersetzungen verbrauchen dieselben KI-Tokens wie eine manuelle Übersetzung und zählen zu Ihrem monatlichen Token-Budget.",
     "description": "Einstellungen zu Anzeige und Editor-Verhalten. Diese werden in deinem Konto gespeichert und gelten geräteübergreifend.",
     "editorAutosave": "Automatisches Speichern im Transkript-Editor",
     "editorAutosaveHelp": "Wenn aktiviert, werden Änderungen im Transkript-Editor wenige Sekunden nach Tippende automatisch gespeichert. Standardmäßig deaktiviert; speichern erfolgt explizit über die Speichern-Buttons oder Strg+S.",
@@ -2209,7 +2213,8 @@
     "showTimestampsSimpleView": "Zeitstempel in der einfachen Ansicht anzeigen",
     "showTimestampsSimpleViewHelp": "Zeigt einen kompakten Zeitstempel mm:ss neben jedem Sprechernamen in der einfachen Ansicht. Die Bubble-Ansicht ist nicht betroffen.",
     "transcriptDisplay": "Transkriptanzeige",
-    "transcriptEditor": "Transkript-Editor"
+    "transcriptEditor": "Transkript-Editor",
+    "translation": "Übersetzung"
   },
   "preview": {
     "placeholderLegend": "Platzhalter-Legende:",
@@ -2837,9 +2842,10 @@
     "switchToBubbleView": "Zur Sprechblasenansicht wechseln",
     "switchToSimpleView": "Zur einfachen Ansicht wechseln",
     "tagDragToReorder": "{{name}} (zum Umsortieren ziehen)",
-    "translateTranscript": "Translate transcript",
-    "reprocessTranslation": "Reprocess translation",
-    "translateTranscriptIncognito": "Translation is unavailable for incognito recordings."
+    "translateTranscript": "Transkript übersetzen",
+    "reprocessTranslation": "Übersetzung neu verarbeiten",
+    "translateTranscriptIncognito": "Die Übersetzung ist für Inkognito-Aufnahmen nicht verfügbar.",
+    "editTranslation": "Übersetzung bearbeiten"
   },
   "transcriptTemplates": {
     "availableTemplates": "Verfügbare Vorlagen",
@@ -3510,10 +3516,10 @@
       "share_permissions_required": "can_edit, can_reshare oder beides angeben",
       "share_update_denied": "Nur die Person, die diese Aufnahme geteilt hat, kann diese Berechtigungen ändern",
       "share_source_locked": "Diese Freigabe stammt von einem Gruppen-Tag oder Gruppenordner, und ihre Berechtigungen folgen dieser Gruppe",
-      "translation_no_transcription": "No transcription available for translation.",
-      "translation_blocked_transcription_failed": "Cannot translate: transcription failed. Please reprocess the transcription first.",
-      "translation_llm_not_configured": "Translation service is not available (LLM client not configured)",
-      "translation_invalid_language": "Unknown target language."
+      "translation_no_transcription": "Keine Transkription für die Übersetzung verfügbar.",
+      "translation_blocked_transcription_failed": "Übersetzung nicht möglich: Die Transkription ist fehlgeschlagen. Bitte verarbeiten Sie die Transkription zuerst neu.",
+      "translation_llm_not_configured": "Der Übersetzungsdienst ist nicht verfügbar (LLM-Client nicht konfiguriert)",
+      "translation_invalid_language": "Unbekannte Zielsprache."
     },
     "apiMessage": {
       "accountUpdated": "Kontodaten erfolgreich aktualisiert!",
@@ -3557,7 +3563,7 @@
       "userAlreadyHasNamingTemplates": "Der Benutzer hat bereits Benennungsvorlagen",
       "userAlreadyHasTemplates": "Der Benutzer hat bereits Vorlagen",
       "voiceProfileCleared": "Stimmprofil für {{name}} gelöscht",
-      "translationQueued": "Translation queued"
+      "translationQueued": "Übersetzung in Warteschlange"
     },
     "form": {
       "required": "Dieses Feld ist erforderlich.",
@@ -3695,13 +3701,14 @@
     "continueToLogin": "Weiter zur Anmeldung"
   },
   "translation": {
-    "title": "Translation",
-    "noTranslation": "No translation available",
-    "generate": "Generate",
-    "generateTitle": "Generate translation",
-    "targetLanguage": "Target language",
-    "preferences": "Translation preferences",
-    "toggle": "Toggle translation",
-    "incognitoUnavailable": "Translation is unavailable for incognito recordings."
+    "title": "Übersetzung",
+    "noTranslation": "Keine Übersetzung verfügbar",
+    "generate": "Übersetzung generieren",
+    "generateTitle": "Übersetzung erstellen",
+    "inProgress": "Übersetzung läuft...",
+    "targetLanguage": "Zielsprache",
+    "preferences": "Übersetzungseinstellungen",
+    "toggle": "Übersetzung umschalten",
+    "incognitoUnavailable": "Die Übersetzung ist für Inkognito-Aufnahmen nicht verfügbar."
   }
 }

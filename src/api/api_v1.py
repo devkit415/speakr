@@ -153,6 +153,7 @@ OPENAPI_SPEC = {
                     "audio_duration": {"type": "number", "description": "Audio duration in seconds"},
                     "transcription_duration_seconds": {"type": "integer", "description": "Wall-clock seconds spent transcribing"},
                     "summarization_duration_seconds": {"type": "integer", "description": "Wall-clock seconds spent summarizing"},
+                    "translation_duration_seconds": {"type": "integer", "description": "Wall-clock seconds spent translating the transcription"},
                     "participants": {"type": "string"},
                     "is_inbox": {"type": "boolean"},
                     "is_highlighted": {"type": "boolean"},
@@ -1070,6 +1071,7 @@ def get_current_user():
             'auto_summarization': current_user.auto_summarization is not False,
             'show_timestamps_simple_view': bool(current_user.show_timestamps_simple_view),
             'editor_autosave': bool(current_user.editor_autosave),
+            'auto_translation': bool(current_user.auto_translation),
             'notify_email_on_completion': bool(current_user.notify_email_on_completion),
             # The per-user diarize preference has had no control since Aug 2025
             # and was never read; report what transcription actually does.
@@ -1131,6 +1133,7 @@ def _recording_list_item(r, refs=None, shared=None):
         'processing_time_seconds': r.processing_time_seconds,
         'transcription_duration_seconds': r.transcription_duration_seconds,
         'summarization_duration_seconds': r.summarization_duration_seconds,
+        'translation_duration_seconds': r.translation_duration_seconds,
         'folder_id': folder['id'] if folder else None,
         'folder': folder,
         'deletion_exempt': r.deletion_exempt,
@@ -1706,6 +1709,7 @@ def get_recording(recording_id):
         'processing_time_seconds': recording.processing_time_seconds,
         'transcription_duration_seconds': recording.transcription_duration_seconds,
         'summarization_duration_seconds': recording.summarization_duration_seconds,
+        'translation_duration_seconds': recording.translation_duration_seconds,
         'folder_id': folder['id'] if folder else None,
         'folder': folder,
         'deletion_exempt': recording.deletion_exempt,
