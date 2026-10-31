@@ -923,7 +923,8 @@
     "saveFolder": "Salvar pasta",
     "send": "Enviar",
     "addParticipant": "Adicionar participante",
-    "deleteShareLink": "Excluir link de compartilhamento"
+    "deleteShareLink": "Excluir link de compartilhamento",
+    "reprocessTranslation": "Reprocess translation"
   },
   "changePasswordModal": {
     "confirmPassword": "Confirmar Nova Senha",
@@ -1694,7 +1695,8 @@
   "headerActions": {
     "deleteRecording": "Excluir gravação",
     "more": "Mais ações",
-    "reprocess": "Reprocessar"
+    "reprocess": "Reprocessar",
+    "reprocessTranslation": "Reprocess translation"
   },
   "help": {
     "actions": "Ações",
@@ -2076,7 +2078,11 @@
     "summaryReprocessingStarted": "Reprocessamento do resumo iniciado",
     "summarySaved": "Resumo salvo!",
     "tagsReordered": "Etiquetas reordenadas",
-    "transcriptionReprocessingStarted": "Reprocessamento da transcrição iniciado"
+    "transcriptionReprocessingStarted": "Reprocessamento da transcrição iniciado",
+    "translationInProgress": "Translation already in progress",
+    "translationFailed": "Translation failed",
+    "noTranslationToCopy": "No transcription available to copy.",
+    "noTranslationToDownload": "No transcription available to download."
   },
   "metadata": {
     "cancelEdit": "Cancelar",
@@ -2830,7 +2836,10 @@
     "playbackSpeedTapToChange": "Velocidade de reprodução (toque para alterar)",
     "switchToBubbleView": "Mudar para visualização em balões",
     "switchToSimpleView": "Mudar para visualização simples",
-    "tagDragToReorder": "{{name}} (arraste para reorganizar)"
+    "tagDragToReorder": "{{name}} (arraste para reorganizar)",
+    "translateTranscript": "Translate transcript",
+    "reprocessTranslation": "Reprocess translation",
+    "translateTranscriptIncognito": "Translation is unavailable for incognito recordings."
   },
   "transcriptTemplates": {
     "availableTemplates": "Modelos Disponíveis",
@@ -3500,7 +3509,11 @@
       "share_permissions_invalid": "can_edit e can_reshare devem ser true ou false",
       "share_permissions_required": "Envie can_edit, can_reshare ou ambos",
       "share_update_denied": "Somente a pessoa que compartilhou esta gravação pode alterar essas permissões",
-      "share_source_locked": "Este compartilhamento vem de uma tag ou pasta de grupo, e suas permissões seguem esse grupo"
+      "share_source_locked": "Este compartilhamento vem de uma tag ou pasta de grupo, e suas permissões seguem esse grupo",
+      "translation_no_transcription": "No transcription available for translation.",
+      "translation_blocked_transcription_failed": "Cannot translate: transcription failed. Please reprocess the transcription first.",
+      "translation_llm_not_configured": "Translation service is not available (LLM client not configured)",
+      "translation_invalid_language": "Unknown target language."
     },
     "apiMessage": {
       "accountUpdated": "Dados da conta atualizados com sucesso!",
@@ -3543,7 +3556,8 @@
       "transcriptionUpdated": "Transcrição atualizada com sucesso.",
       "userAlreadyHasNamingTemplates": "O usuário já tem modelos de nomenclatura",
       "userAlreadyHasTemplates": "O usuário já tem modelos",
-      "voiceProfileCleared": "Perfil de voz de {{name}} apagado"
+      "voiceProfileCleared": "Perfil de voz de {{name}} apagado",
+      "translationQueued": "Translation queued"
     },
     "form": {
       "required": "Este campo é obrigatório.",
@@ -3679,5 +3693,15 @@
     "emailVerifiedHeading": "E-mail verificado!",
     "emailVerifiedHelp": "Seu endereço de e-mail foi verificado com sucesso. Agora você pode entrar na sua conta.",
     "continueToLogin": "Continuar para o login"
+  },
+  "translation": {
+    "title": "Translation",
+    "noTranslation": "No translation available",
+    "generate": "Generate",
+    "generateTitle": "Generate translation",
+    "targetLanguage": "Target language",
+    "preferences": "Translation preferences",
+    "toggle": "Toggle translation",
+    "incognitoUnavailable": "Translation is unavailable for incognito recordings."
   }
 }

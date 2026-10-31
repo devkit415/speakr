@@ -40,6 +40,7 @@ export function useUI(state, utils, processedTranscription) {
         leftColumnWidth, rightColumnWidth, isResizing, playerVolume,
         audioIsPlaying, audioCurrentTime, audioDuration, audioIsMuted, audioIsLoading,
         editingNotes, tempNotesContent, transcriptionViewMode,
+        viewingTranslation,
         notesMarkdownEditor, markdownEditorInstance, autoSaveTimer, csrfToken,
         summaryMarkdownEditor, recordingNotesEditor, recordingMarkdownEditorInstance,
         recordingNotes, showDownloadMenu, transcriptDownloadFormat, currentPlayingSegmentIndex, followPlayerMode,
@@ -1541,8 +1542,18 @@ export function useUI(state, utils, processedTranscription) {
         document.body.removeChild(textArea);
     };
 
+    const getDisplayedTranscription = () => {
+        const rec = selectedRecording.value;
+        if (!rec) return '';
+        if (viewingTranslation.value && rec.transcription_translation) {
+            return rec.transcription_translation;
+        }
+        return rec.transcription || '';
+    };
+
     const copyTranscription = (event) => {
-        if (!selectedRecording.value || !selectedRecording.value.transcription) {
+        const displayed = getDisplayedTranscription();
+        if (!selectedRecording.value || !displayed) {
             showToast(t('messages.noTranscriptionToCopy'), 'fa-exclamation-circle');
             return;
         }
@@ -1551,7 +1562,7 @@ export function useUI(state, utils, processedTranscription) {
         let textToCopy = '';
 
         try {
-            const transcriptionData = JSON.parse(selectedRecording.value.transcription);
+            const transcriptionData = JSON.parse(displayed);
             if (Array.isArray(transcriptionData)) {
                 const wasDiarized = transcriptionData.some(segment => segment.speaker);
                 if (wasDiarized) {
@@ -1562,10 +1573,10 @@ export function useUI(state, utils, processedTranscription) {
                     textToCopy = transcriptionData.map(segment => segment.text || segment.sentence).join('\n');
                 }
             } else {
-                textToCopy = selectedRecording.value.transcription;
+                textToCopy = displayed;
             }
         } catch (e) {
-            textToCopy = selectedRecording.value.transcription;
+            textToCopy = displayed;
         }
 
         animateCopyButton(button);
@@ -1649,7 +1660,8 @@ export function useUI(state, utils, processedTranscription) {
     };
 
     const downloadTranscript = async () => {
-        if (!selectedRecording.value || !selectedRecording.value.transcription) {
+        const displayed = getDisplayedTranscription();
+        if (!selectedRecording.value || !displayed) {
             showToast(t('messages.noTranscriptionToDownload'), 'fa-exclamation-circle');
             return;
         }
@@ -1747,7 +1759,7 @@ export function useUI(state, utils, processedTranscription) {
             if (templateId === 'none') {
                 let rawText = '';
                 try {
-                    const transcriptionData = JSON.parse(selectedRecording.value.transcription);
+                    const transcriptionData = JSON.parse(displayed);
                     if (Array.isArray(transcriptionData)) {
                         rawText = transcriptionData.map(segment => {
                             const speaker = segment.speaker || t('sharing.unknown');
@@ -1755,10 +1767,10 @@ export function useUI(state, utils, processedTranscription) {
                             return `${speaker}: ${text}`;
                         }).join('\n');
                     } else {
-                        rawText = selectedRecording.value.transcription;
+                        rawText = displayed;
                     }
                 } catch (e) {
-                    rawText = selectedRecording.value.transcription;
+                    rawText = displayed;
                 }
 
                 const title = selectedRecording.value.title || 'transcript';
@@ -1810,13 +1822,31 @@ export function useUI(state, utils, processedTranscription) {
 
     // Download with default template (no modal)
     const downloadWithDefaultTemplate = async () => {
-        if (!selectedRecording.value || !selectedRecording.value.transcription) {
+        const displayed = getDisplayedTranscription();
+        if (!selectedRecording.value || !displayed) {
             showToast(t('messages.noTranscriptionToDownload'), 'fa-exclamation-circle');
             return;
         }
 
         try {
             const fmt = transcriptDownloadFormat.value === 'md' ? 'md' : 'txt';
+            if (viewingTranslation.value) {
+                const text = getDisplayedTranscription();
+                const title = selectedRecording.value.title || 'transcript';
+                const content = fmt === 'md' ? `# ${title}\\n\\n${text}\\n` : text;
+                const mime = fmt === 'md' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8';
+                const blob = new Blob([content], { type: mime });
+                const downloadUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = `${title}_translation.${fmt}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(downloadUrl);
+                showToast(t('messages.transcriptDownloadSuccess'));
+                return;
+            }
             // Download using the default template (server will use user's default)
             const response = await fetch(`/recording/${selectedRecording.value.id}/download/transcript?format=${fmt}`);
             if (!response.ok) {

@@ -873,6 +873,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             const followPlayerMode = ref(false);
             const processingIndicatorMinimized = ref(false);
 
+            // --- Translation view state ---
+            const viewingTranslation = ref(false);
+            const showTranslationModal = ref(false);
+            const translationTargetLanguage = ref('');
+            watch(() => selectedRecording.value?.id, () => {
+                viewingTranslation.value = false;
+                showTranslationModal.value = false;
+            });
+
             // --- Chat State ---
             const showChat = ref(false);
             const isChatMaximized = ref(false);
@@ -1919,6 +1928,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 transcriptionViewMode, legendExpanded, highlightedSpeaker, showDownloadMenu,
                 transcriptDownloadFormat, showUploadSplitMenu,
                 currentPlayingSegmentIndex, followPlayerMode, processingIndicatorMinimized,
+                viewingTranslation, showTranslationModal, translationTargetLanguage,
 
                 // Chat
                 showChat, isChatMaximized, chatMessages, chatInput, isChatLoading, chatMessagesRef, chatInputRef,
@@ -2243,12 +2253,30 @@ document.addEventListener('DOMContentLoaded', async () => {
             // COMPUTED PROPERTIES (define before composables that need them)
             // =========================================================================
 
+            const displayTranscription = computed(() => {
+                if (!selectedRecording.value) return '';
+                if (viewingTranslation.value) {
+                    return selectedRecording.value.transcription_translation || '';
+                }
+                return selectedRecording.value.transcription || '';
+            });
+
+            const translationJobActive = computed(() => {
+                const rec = selectedRecording.value;
+                if (!rec) return false;
+                return (allJobs.value || []).some(j =>
+                    j.recording_id === rec.id &&
+                    j.job_type === 'translate_transcription' &&
+                    (j.job_status === 'queued' || j.job_status === 'processing')
+                );
+            });
+
             const processedTranscription = computed(() => {
-                if (!selectedRecording.value?.transcription) {
+                if (!displayTranscription.value) {
                     return { hasDialogue: false, content: '', speakers: [], simpleSegments: [], bubbleRows: [], isError: false };
                 }
 
-                const transcription = selectedRecording.value.transcription;
+                const transcription = displayTranscription.value;
 
                 // Check for error message format
                 const errorInfo = parseTranscriptionError(transcription);
@@ -2602,6 +2630,38 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Add startUpload to utils for audio composable to use
             utils.startUploadQueue = uploadComposable.startUpload;
+
+            const generateTranslation = async (targetLanguage) => {
+                if (!selectedRecording.value) return;
+                if (translationJobActive.value) {
+                    showToast(t('messages.translationInProgress') || 'Translation already in progress', 'fa-exclamation-circle');
+                    return;
+                }
+                try {
+                    const body = {};
+                    const lang = (targetLanguage !== undefined && targetLanguage !== null && String(targetLanguage).trim() !== '')
+                        ? targetLanguage
+                        : (translationTargetLanguage.value || '');
+                    if (lang) body.target_language = lang;
+                    const res = await fetch(`/recording/${selectedRecording.value.id}/translate_transcription`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': (typeof getCsrfToken === 'function' ? getCsrfToken() : '') },
+                        body: JSON.stringify(body)
+                    });
+                    let data = {};
+                    try { data = await res.json(); } catch (e) { data = {}; }
+                    if (res.ok) {
+                        showTranslationModal.value = false;
+                        viewingTranslation.value = true;
+                        showToast(data.message || t('server.apiMessage.translationQueued'));
+                    } else {
+                        showToast(data.error || data.message || t('messages.translationFailed') || 'Translation failed', 'fa-exclamation-circle');
+                    }
+                } catch (e) {
+                    console.error('Translation error:', e);
+                    showToast(t('messages.translationFailed') || 'Translation failed', 'fa-exclamation-circle');
+                }
+            };
 
             const audioComposable = useAudio(state, utils);
             // Expose the full discard (clears the blob, aborts any server
@@ -3140,14 +3200,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     // done, so its transcribe completion still moves it to
                     // COMPLETED below.
                     if (job.job_type === 'merge' && job.job_status === 'completed') {
-                        if (!completedRecordingIds.has(`merge_${job.recording_id}`)) {
-                            completedRecordingIds.add(`merge_${job.recording_id}`);
+                        if (!completedRecordingIds.has(`merge_${job.id}`)) {
+                            completedRecordingIds.add(`merge_${job.id}`);
                             reconcileNeeded = true;
                         }
                         continue;
                     }
-                    if (job.job_status === 'completed' && !completedRecordingIds.has(job.recording_id)) {
-                        completedRecordingIds.add(job.recording_id);
+                    if (job.job_status === 'completed' && !completedRecordingIds.has(`${job.job_type}_${job.id}`)) {
+                        completedRecordingIds.add(`${job.job_type}_${job.id}`);
                         try {
                             const fullResponse = await fetch(`/api/recordings/${job.recording_id}`);
                             if (fullResponse.ok) {
@@ -3176,8 +3236,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         } catch (err) {
                             console.error(`Error fetching completed recording ${job.recording_id}:`, err);
                         }
-                    } else if (job.job_status === 'failed' && !completedRecordingIds.has(`fail_${job.recording_id}`)) {
-                        completedRecordingIds.add(`fail_${job.recording_id}`);
+                    } else if (job.job_status === 'failed' && !completedRecordingIds.has(`fail_${job.id}`)) {
+                        completedRecordingIds.add(`fail_${job.id}`);
                         try {
                             const failedResponse = await fetch(`/api/recordings/${job.recording_id}`);
                             if (failedResponse.ok) {
@@ -4421,6 +4481,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 isMobileScreen,
                 isMobileDevice,
                 processedTranscription,
+                displayTranscription,
+                translationJobActive,
                 groupedRecordings,
                 visibleRecordingIds,
                 filteredAvailableTags,
@@ -4564,6 +4626,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Inline tag/folder creation (upload dialog)
                 createTagFromUploadSearch,
                 createFolderFromUpload,
+
+                // Translation
+                generateTranslation,
 
                 // Speaker count entry (#362)
                 exactSpeakerEntry, setSpeakerCountMode,

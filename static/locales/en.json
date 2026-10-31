@@ -923,7 +923,8 @@
     "startReprocessing": "Start Reprocessing",
     "saveFolder": "Save Folder",
     "addParticipant": "Add Participant",
-    "deleteShareLink": "Delete Share Link"
+    "deleteShareLink": "Delete Share Link",
+    "reprocessTranslation": "Reprocess translation"
   },
   "changePasswordModal": {
     "confirmPassword": "Confirm New Password",
@@ -1694,7 +1695,8 @@
   "headerActions": {
     "deleteRecording": "Delete recording",
     "more": "More actions",
-    "reprocess": "Reprocess"
+    "reprocess": "Reprocess",
+    "reprocessTranslation": "Reprocess translation"
   },
   "help": {
     "actions": "Actions",
@@ -2076,7 +2078,11 @@
     "summaryReprocessingStarted": "Summary reprocessing started",
     "summarySaved": "Summary saved!",
     "tagsReordered": "Tags reordered",
-    "transcriptionReprocessingStarted": "Transcription reprocessing started"
+    "transcriptionReprocessingStarted": "Transcription reprocessing started",
+    "translationInProgress": "Translation already in progress",
+    "translationFailed": "Translation failed",
+    "noTranslationToCopy": "No transcription available to copy.",
+    "noTranslationToDownload": "No transcription available to download."
   },
   "metadata": {
     "cancelEdit": "Cancel",
@@ -2830,7 +2836,10 @@
     "playbackSpeedTapToChange": "Playback speed (tap to change)",
     "switchToBubbleView": "Switch to bubble view",
     "switchToSimpleView": "Switch to simple view",
-    "tagDragToReorder": "{{name}} (drag to reorder)"
+    "tagDragToReorder": "{{name}} (drag to reorder)",
+    "translateTranscript": "Translate transcript",
+    "reprocessTranslation": "Reprocess translation",
+    "translateTranscriptIncognito": "Translation is unavailable for incognito recordings."
   },
   "transcriptTemplates": {
     "availableTemplates": "Available Templates",
@@ -3500,7 +3509,11 @@
       "share_permissions_invalid": "can_edit and can_reshare must be true or false",
       "share_permissions_required": "Send can_edit, can_reshare or both",
       "share_update_denied": "Only the person who shared this recording can change these permissions",
-      "share_source_locked": "This share comes from a group tag or folder, and its permissions follow that group"
+      "share_source_locked": "This share comes from a group tag or folder, and its permissions follow that group",
+      "translation_no_transcription": "No transcription available for translation.",
+      "translation_blocked_transcription_failed": "Cannot translate: transcription failed. Please reprocess the transcription first.",
+      "translation_llm_not_configured": "Translation service is not available (LLM client not configured)",
+      "translation_invalid_language": "Unknown target language."
     },
     "apiMessage": {
       "accountUpdated": "Account details updated successfully!",
@@ -3543,7 +3556,8 @@
       "transcriptionUpdated": "Transcription updated successfully.",
       "userAlreadyHasNamingTemplates": "User already has naming templates",
       "userAlreadyHasTemplates": "User already has templates",
-      "voiceProfileCleared": "Voice profile cleared for {{name}}"
+      "voiceProfileCleared": "Voice profile cleared for {{name}}",
+      "translationQueued": "Translation queued"
     },
     "form": {
       "required": "This field is required.",
@@ -3679,5 +3693,15 @@
     "emailVerifiedHeading": "Email Verified!",
     "emailVerifiedHelp": "Your email address has been successfully verified. You can now log in to your account.",
     "continueToLogin": "Continue to Login"
+  },
+  "translation": {
+    "title": "Translation",
+    "noTranslation": "No translation available",
+    "generate": "Generate",
+    "generateTitle": "Generate translation",
+    "targetLanguage": "Target language",
+    "preferences": "Translation preferences",
+    "toggle": "Toggle translation",
+    "incognitoUnavailable": "Translation is unavailable for incognito recordings."
   }
 }

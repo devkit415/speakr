@@ -2009,6 +2009,97 @@ def update_transcription(recording_id):
         current_app.logger.error(f"Error updating transcription for recording {recording_id}: {e}", exc_info=True)
         return jsonify(api_error('unexpected_error_updating_transcription')), 500
 
+
+def _canonical_translation_language(value):
+    """Resolve a user-supplied target language to a canonical full name.
+
+    Accepts either the full language name or its ISO code (as listed in
+    OUTPUT_LANGUAGES). Returns None for anything not recognised.
+    """
+    if value is None:
+        return None
+    needle = str(value).strip()
+    if not needle:
+        return None
+    lowered = needle.lower()
+    try:
+        from src.utils.language import OUTPUT_LANGUAGES
+
+        for name, iso in OUTPUT_LANGUAGES:
+            if name.lower() == lowered or str(iso).lower() == lowered:
+                return name
+    except Exception:
+        pass
+    return None
+
+
+@recordings_bp.route('/recording/<int:recording_id>/translate_transcription', methods=['POST'])
+@login_required
+def translate_transcription(recording_id):
+    """Queue a translation of a recording's transcription."""
+    try:
+        recording = db.session.get(Recording, recording_id)
+        if not recording or not has_recording_access(recording, current_user):
+            return jsonify(api_error('recording_not_found')), 404
+
+        if not has_recording_access(recording, current_user, require_edit=True):
+            return jsonify(api_error('recording_edit_denied')), 403
+
+        if not recording.transcription or len(recording.transcription.strip()) < 10:
+            return jsonify(api_error('translation_no_transcription')), 400
+
+        from src.utils.error_formatting import is_transcription_error
+        if is_transcription_error(recording.transcription):
+            return jsonify(api_error('translation_blocked_transcription_failed')), 400
+
+        from src.services.llm import TRANSLATION_MODEL_CONFIGURED
+        if not TRANSLATION_MODEL_CONFIGURED:
+            return jsonify(api_error('translation_llm_not_configured')), 503
+
+        data = request.get_json(silent=True) or {}
+        raw_target = data.get('target_language')
+
+        if raw_target is None or str(raw_target).strip() == '':
+            # Resolve to the user's output language, then interface language.
+            target_language = None
+            if getattr(current_user, 'output_language', None):
+                target_language = _canonical_translation_language(current_user.output_language) or current_user.output_language
+            if not target_language:
+                try:
+                    from src.utils.language import output_language_name_for_code
+
+                    target_language = output_language_name_for_code(getattr(current_user, 'ui_language', None))
+                except Exception:
+                    target_language = None
+        else:
+            target_language = _canonical_translation_language(raw_target)
+            if target_language is None:
+                return jsonify(api_error('translation_invalid_language')), 400
+
+        from src.services.job_queue import job_queue
+
+        job_params = {'user_id': current_user.id}
+        if target_language:
+            job_params['target_language'] = target_language
+
+        job_id = job_queue.enqueue(
+            user_id=current_user.id,
+            recording_id=recording.id,
+            job_type='translate_transcription',
+            params=job_params,
+        )
+
+        return jsonify({
+            'success': True,
+            'job_id': job_id,
+            'message': translate('server.apiMessage.translationQueued')
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error starting translation for recording {recording_id}: {e}", exc_info=True)
+        return jsonify(api_error('unexpected_error_updating_transcription')), 500
+
 # Toggle inbox status endpoint
 
 

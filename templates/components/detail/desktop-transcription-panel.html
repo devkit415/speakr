@@ -9,10 +9,15 @@
          default; the toggle modifies that default), not a pair of tabs. -->
     <div class="tabs-bar px-4">
         <div class="tabs">
-            <span class="tab is-active" style="cursor: default;">
+            <button type="button" class="tab" :class="{ 'is-active': !viewingTranslation }" @click="viewingTranslation = false">
                 <i class="fas fa-file-text" style="font-size: 13px; opacity: 0.7;"></i>
                 <span v-text="t('transcription.title')"></span>
-            </span>
+            </button>
+            <button type="button" class="tab" :class="{ 'is-active': viewingTranslation }" @click="viewingTranslation = true">
+                <i class="fas fa-language" style="font-size: 13px; opacity: 0.7;"></i>
+                <span v-text="t('translation.title')"></span>
+                <span v-if="selectedRecording && selectedRecording.transcription_translation_language" class="ml-1 text-xs opacity-80">(${ selectedRecording.transcription_translation_language })</span>
+            </button>
         </div>
         <div class="tabs-bar__actions">
             <!-- Follow Player toggle (icon-only; label in tooltip) -->
@@ -81,6 +86,8 @@
             <button @click="openTranscriptionEditor"
                     v-if="selectedRecording && selectedRecording.transcription"
                     class="btn btn--icon"
+                    :disabled="viewingTranslation"
+                    :class="{ 'opacity-40 cursor-not-allowed': viewingTranslation }"
                     :title="t('tooltips.editTranscript')">
                 <i class="fas fa-pen"></i>
             </button>
@@ -118,6 +125,30 @@
             <p class="text-[var(--text-muted)]" v-text="t('transcription.noTranscription')"></p>
         </div>
 
+        <!-- Empty translation state -->
+        <div v-if="viewingTranslation && !(selectedRecording && selectedRecording.transcription_translation)" class="text-center py-8">
+            <i class="fas fa-language text-3xl text-[var(--text-muted)] mb-3"></i>
+            <p class="text-[var(--text-muted)] mb-4" v-text="t('translation.noTranslation')"></p>
+            <template v-if="selectedRecording && selectedRecording.incognito">
+                <div class="flex items-center justify-center gap-2" :title="t('tooltips.translateTranscriptIncognito')">
+                    <i class="fas fa-user-secret text-[var(--text-muted)]"></i>
+                    <span class="text-sm text-[var(--text-muted)]" v-text="t('translation.incognitoUnavailable')"></span>
+                </div>
+            </template>
+            <template v-else>
+                <div class="flex items-center justify-center gap-2">
+                    <button @click="generateTranslation()" :disabled="translationJobActive"
+                            class="btn btn--primary btn--sm" :class="{ 'opacity-50 cursor-not-allowed': translationJobActive }">
+                        <i class="fas fa-language mr-1"></i>
+                        <span v-text="t('translation.generate')"></span>
+                    </button>
+                    <button @click="showTranslationModal = true" class="btn btn--icon" :title="t('translation.preferences')">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                </div>
+            </template>
+        </div>
+
         <!-- Error Display (when transcription is an error message) -->
         <div v-if="processedTranscription.isError" class="error-display-container">
             {% include 'components/detail/_transcription-error.html' %}
@@ -143,8 +174,8 @@
             </div>
         </div>
 
-        <!-- Transcription Display (hide if it's an error) -->
-        <div v-if="selectedRecording.transcription && !processedTranscription.isError">
+        <!-- Transcription Display (hide if it's an error, or while viewing an empty translation) -->
+        <div v-if="selectedRecording.transcription && !processedTranscription.isError && !(viewingTranslation && !(selectedRecording && selectedRecording.transcription_translation))">
             <!-- Simple View -->
             <div v-if="!processedTranscription.hasDialogue || transcriptionViewMode === 'simple'"
                  class="transcription-simple-view">
@@ -217,6 +248,28 @@
                         </div>
                     </div>
                 </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Translation generation modal -->
+    <div v-if="showTranslationModal" class="modal-overlay" @click.self="showTranslationModal = false">
+        <div class="modal-panel modal-panel--sm">
+            <div class="modal-header">
+                <h3 class="modal-title" v-text="t('translation.generateTitle')"></h3>
+                <button class="modal-close" @click="showTranslationModal = false"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <label class="block text-sm mb-2" v-text="t('translation.targetLanguage')"></label>
+                <select v-model="translationTargetLanguage" class="w-full">
+                    {% for name, iso in output_languages %}
+                    <option value="{{ name }}">{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn--ghost" @click="showTranslationModal = false" v-text="t('common.cancel')"></button>
+                <button class="btn btn--primary" @click="generateTranslation(translationTargetLanguage)" :disabled="translationJobActive" v-text="t('translation.generate')"></button>
             </div>
         </div>
     </div>

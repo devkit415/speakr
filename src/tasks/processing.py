@@ -2398,6 +2398,36 @@ def transcribe_with_connector(app_context, recording_id, filepath, original_file
                 current_app.logger.info(f"Auto-generating summary for recording {recording_id}")
                 generate_summary_only_task(app_context, recording_id)
 
+            # Auto-translation: admin setting prevails over the user preference.
+            # Both must allow it; the recording status stays untouched.
+            try:
+                admin_setting = SystemSetting.get_setting('disable_auto_translation', True)
+                admin_disabled = admin_setting if isinstance(admin_setting, bool) else str(admin_setting).lower() == 'true'
+                user = db.session.get(User, recording.user_id)
+                if (not admin_disabled) and user is not None and getattr(user, 'auto_translation', False):
+                    target_language = None
+                    if getattr(user, 'output_language', None):
+                        target_language = user.output_language
+                    else:
+                        try:
+                            from src.utils.language import output_language_name_for_code
+
+                            target_language = output_language_name_for_code(getattr(user, 'ui_language', None))
+                        except Exception:
+                            target_language = None
+
+                    from src.services.job_queue import job_queue
+
+                    job_queue.enqueue(
+                        user_id=recording.user_id,
+                        recording_id=recording.id,
+                        job_type='translate_transcription',
+                        params={'user_id': recording.user_id, 'target_language': target_language},
+                    )
+                    current_app.logger.info(f"Auto-translation queued for recording {recording_id}")
+            except Exception as auto_translate_err:
+                current_app.logger.warning(f"Auto-translation trigger failed for recording {recording_id}: {auto_translate_err}")
+
         except Exception as e:
             db.session.rollback()
             error_msg = str(e)
@@ -2907,3 +2937,38 @@ Summarization Instructions:
         current_app.logger.warning(f"[Incognito] Summary generation failed: {e}")
 
     return None
+
+
+def translate_transcription_task(app_context, recording_id, user_id=None, target_language=None, params=None, **kwargs):
+    """Translate a recording's transcription (job wrapper entry point)."""
+    from src.services.transcription_translation import translate_transcription
+
+    with app_context:
+        from src.database import db
+        from src.models import Recording
+
+        recording = db.session.get(Recording, recording_id)
+        if recording is None:
+            raise ValueError(f"Recording {recording_id} not found")
+
+        uid = user_id
+        lang = target_language
+        if isinstance(params, dict):
+            if uid is None:
+                uid = params.get('user_id', params.get('userId'))
+            if lang is None:
+                lang = params.get('target_language', params.get('targetLanguage', params.get('language')))
+        if uid is None:
+            uid = getattr(recording, 'user_id', None)
+        if lang is None:
+            try:
+                from src.services.transcription_translation import _resolve_target_language
+
+                lang = _resolve_target_language(uid, None)
+            except Exception:
+                lang = None
+        if not lang:
+            lang = 'English'
+
+        translate_transcription(recording, user_id=uid, target_language=lang)
+        return recording.id

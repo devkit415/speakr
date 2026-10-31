@@ -923,7 +923,8 @@
     "saveFolder": "Enregistrer le dossier",
     "send": "Envoyer",
     "addParticipant": "Ajouter un participant",
-    "deleteShareLink": "Supprimer le lien de partage"
+    "deleteShareLink": "Supprimer le lien de partage",
+    "reprocessTranslation": "Reprocess translation"
   },
   "changePasswordModal": {
     "confirmPassword": "Confirmer le Nouveau Mot de Passe",
@@ -1694,7 +1695,8 @@
   "headerActions": {
     "deleteRecording": "Supprimer l’enregistrement",
     "more": "Autres actions",
-    "reprocess": "Retraiter"
+    "reprocess": "Retraiter",
+    "reprocessTranslation": "Reprocess translation"
   },
   "help": {
     "actions": "Actions",
@@ -2076,7 +2078,11 @@
     "summaryReprocessingStarted": "Retraitement du résumé lancé",
     "summarySaved": "Résumé enregistré !",
     "tagsReordered": "Étiquettes réorganisées",
-    "transcriptionReprocessingStarted": "Retraitement de la transcription lancé"
+    "transcriptionReprocessingStarted": "Retraitement de la transcription lancé",
+    "translationInProgress": "Translation already in progress",
+    "translationFailed": "Translation failed",
+    "noTranslationToCopy": "No transcription available to copy.",
+    "noTranslationToDownload": "No transcription available to download."
   },
   "metadata": {
     "cancelEdit": "Annuler",
@@ -2830,7 +2836,10 @@
     "playbackSpeedTapToChange": "Vitesse de lecture (touchez pour changer)",
     "switchToBubbleView": "Passer à la vue en bulles",
     "switchToSimpleView": "Passer à la vue simple",
-    "tagDragToReorder": "{{name}} (glissez pour réorganiser)"
+    "tagDragToReorder": "{{name}} (glissez pour réorganiser)",
+    "translateTranscript": "Translate transcript",
+    "reprocessTranslation": "Reprocess translation",
+    "translateTranscriptIncognito": "Translation is unavailable for incognito recordings."
   },
   "transcriptTemplates": {
     "availableTemplates": "Modèles Disponibles",
@@ -3500,7 +3509,11 @@
       "share_permissions_invalid": "can_edit et can_reshare doivent valoir true ou false",
       "share_permissions_required": "Envoyez can_edit, can_reshare ou les deux",
       "share_update_denied": "Seule la personne qui a partagé cet enregistrement peut modifier ces autorisations",
-      "share_source_locked": "Ce partage provient d'une étiquette ou d'un dossier de groupe, et ses autorisations suivent ce groupe"
+      "share_source_locked": "Ce partage provient d'une étiquette ou d'un dossier de groupe, et ses autorisations suivent ce groupe",
+      "translation_no_transcription": "No transcription available for translation.",
+      "translation_blocked_transcription_failed": "Cannot translate: transcription failed. Please reprocess the transcription first.",
+      "translation_llm_not_configured": "Translation service is not available (LLM client not configured)",
+      "translation_invalid_language": "Unknown target language."
     },
     "apiMessage": {
       "accountUpdated": "Informations du compte mises à jour !",
@@ -3543,7 +3556,8 @@
       "transcriptionUpdated": "Transcription mise à jour avec succès.",
       "userAlreadyHasNamingTemplates": "L'utilisateur possède déjà des modèles de nommage",
       "userAlreadyHasTemplates": "L'utilisateur possède déjà des modèles",
-      "voiceProfileCleared": "Profil vocal effacé pour {{name}}"
+      "voiceProfileCleared": "Profil vocal effacé pour {{name}}",
+      "translationQueued": "Translation queued"
     },
     "form": {
       "required": "Ce champ est obligatoire.",
@@ -3679,5 +3693,15 @@
     "emailVerifiedHeading": "E-mail vérifié !",
     "emailVerifiedHelp": "Votre adresse e-mail a bien été vérifiée. Vous pouvez maintenant vous connecter à votre compte.",
     "continueToLogin": "Continuer vers la connexion"
+  },
+  "translation": {
+    "title": "Translation",
+    "noTranslation": "No translation available",
+    "generate": "Generate",
+    "generateTitle": "Generate translation",
+    "targetLanguage": "Target language",
+    "preferences": "Translation preferences",
+    "toggle": "Toggle translation",
+    "incognitoUnavailable": "Translation is unavailable for incognito recordings."
   }
 }

@@ -37,8 +37,36 @@
             {% include 'components/detail/_transcription-error.html' %}
         </div>
 
+        <!-- Translation toggle (mobile) -->
+        <div v-if="selectedRecording && selectedRecording.transcription_translation" class="flex items-center gap-2 mb-3 px-1">
+            <button @click="viewingTranslation = false" :class="['btn btn--sm', viewingTranslation ? 'btn--ghost' : 'btn--primary']" v-text="t('transcription.title')"></button>
+            <button @click="viewingTranslation = true" :class="['btn btn--sm', viewingTranslation ? 'btn--primary' : 'btn--ghost']" v-text="t('translation.title')"></button>
+        </div>
+
+        <!-- Empty translation state (mobile) -->
+        <div v-if="viewingTranslation && !(selectedRecording && selectedRecording.transcription_translation)" class="text-center py-8">
+            <i class="fas fa-language text-3xl text-[var(--text-muted)] mb-3"></i>
+            <p class="text-[var(--text-muted)] mb-4" v-text="t('translation.noTranslation')"></p>
+            <template v-if="selectedRecording && selectedRecording.incognito">
+                <div class="flex items-center justify-center gap-2" :title="t('tooltips.translateTranscriptIncognito')">
+                    <i class="fas fa-user-secret text-[var(--text-muted)]"></i>
+                    <span class="text-sm text-[var(--text-muted)]" v-text="t('translation.incognitoUnavailable')"></span>
+                </div>
+            </template>
+            <template v-else>
+                <div class="flex items-center justify-center gap-2">
+                    <button @click="generateTranslation()" :disabled="translationJobActive" class="btn btn--primary btn--sm">
+                        <span v-text="t('translation.generate')"></span>
+                    </button>
+                    <button @click="showTranslationModal = true" class="btn btn--icon" :title="t('translation.preferences')">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                </div>
+            </template>
+        </div>
+
         <!-- Transcription content (show regardless of processing state if transcription exists) -->
-        <div v-if="selectedRecording.transcription && !processedTranscription.isError">
+        <div v-if="selectedRecording.transcription && !processedTranscription.isError && !(viewingTranslation && !(selectedRecording && selectedRecording.transcription_translation))">
             <!-- Speaker-run layout: consecutive same-speaker segments
                  grouped under one .speaker-run so the speaker pill at
                  the top of the run can stay sticky for the WHOLE run.
@@ -104,6 +132,28 @@
                         </div>
                     </div>
                 </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Translation generation modal (mobile) -->
+    <div v-if="showTranslationModal" class="modal-overlay" @click.self="showTranslationModal = false">
+        <div class="modal-panel modal-panel--sm">
+            <div class="modal-header">
+                <h3 class="modal-title" v-text="t('translation.generateTitle')"></h3>
+                <button class="modal-close" @click="showTranslationModal = false"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <label class="block text-sm mb-2" v-text="t('translation.targetLanguage')"></label>
+                <select v-model="translationTargetLanguage" class="w-full">
+                    {% for name, iso in output_languages %}
+                    <option value="{{ name }}">{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn--ghost" @click="showTranslationModal = false" v-text="t('common.cancel')"></button>
+                <button class="btn btn--primary" @click="generateTranslation(translationTargetLanguage)" :disabled="translationJobActive" v-text="t('translation.generate')"></button>
             </div>
         </div>
     </div>

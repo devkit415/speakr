@@ -1132,6 +1132,15 @@ def _run_migrations(app, engine):
             )
             app.logger.info("Initialized disable_auto_summarization setting")
 
+        if not SystemSetting.query.filter_by(key='disable_auto_translation').first():
+            SystemSetting.set_setting(
+                key='disable_auto_translation',
+                value='true',
+                description='Disable automatic translation after transcription completes. When enabled, recordings will only be transcribed and users must manually trigger translation.',
+                setting_type='boolean'
+            )
+            app.logger.info("Initialized disable_auto_translation setting")
+
         if not SystemSetting.query.filter_by(key='admin_default_hotwords').first():
             SystemSetting.set_setting(
                 key='admin_default_hotwords',

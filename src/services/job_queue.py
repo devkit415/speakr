@@ -36,7 +36,7 @@ POLL_INTERVAL = 1.0  # seconds between checking for new jobs
 # Every consumer routes via "SUMMARY_JOBS if ... else TRANSCRIPTION_JOBS", so
 # membership in this list is the single source of truth for the whole pipeline.
 TRANSCRIPTION_JOBS = ['transcribe', 'reprocess_transcription', 'stitch', 'merge']
-SUMMARY_JOBS = ['summarize', 'reprocess_summary']
+SUMMARY_JOBS = ['summarize', 'reprocess_summary', 'translate_transcription']
 
 
 class FairJobQueue:
@@ -362,6 +362,8 @@ class FairJobQueue:
                     self._run_stitch(job, recording, params)
                 elif job_type == 'merge':
                     self._run_merge(job, recording, params)
+                elif job_type == 'translate_transcription':
+                    self._run_translation(job, recording, params)
                 else:
                     raise ValueError(f"Unknown job type: {job_type}")
 
@@ -439,7 +441,7 @@ class FairJobQueue:
 
                         # Always keep recordings with FAILED status so users can see the error
                         # and reprocess later (e.g., when ASR server recovers)
-                        if recording:
+                        if recording and job_type != 'translate_transcription':
                             # Keep the recording with FAILED status so user can see the error and fix settings
                             recording.status = 'FAILED'
                             # Format the error for nice display. A failed summary
@@ -448,7 +450,7 @@ class FairJobQueue:
                             from src.utils.error_formatting import format_error_for_storage
                             if job_type in ('summarize', 'reprocess_summary'):
                                 recording.summary = format_error_for_storage(error_str)
-                            else:
+                            elif job_type != 'translate_transcription':
                                 recording.transcription = format_error_for_storage(error_str)
 
                         if is_permanent_error:
@@ -650,6 +652,20 @@ class FairJobQueue:
             db.session.commit()
             raise
 
+    def _run_translation(self, job, recording, params):
+        """Translate a recording's transcription (summary worker pool)."""
+        from flask import current_app
+        from src.tasks.processing import translate_transcription_task
+
+        params = params or {}
+        translate_transcription_task(
+            current_app._get_current_object().app_context(),
+            recording.id,
+            user_id=params.get('user_id', job.user_id),
+            target_language=params.get('target_language'),
+            params=params,
+        )
+
     def enqueue(
         self,
         user_id: int,
@@ -700,7 +716,10 @@ class FairJobQueue:
             # Update recording status based on job type
             recording = db.session.get(Recording, recording_id)
             if recording:
-                if job_type in SUMMARY_JOBS:
+                if job_type == 'translate_transcription':
+                    # Leave recording status untouched.
+                    pass
+                elif job_type in SUMMARY_JOBS:
                     recording.status = 'SUMMARIZING'
                 else:
                     recording.status = 'QUEUED'

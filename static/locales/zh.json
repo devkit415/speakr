@@ -923,7 +923,8 @@
     "saveFolder": "保存文件夹",
     "send": "发送",
     "addParticipant": "添加参与者",
-    "deleteShareLink": "删除分享链接"
+    "deleteShareLink": "删除分享链接",
+    "reprocessTranslation": "Reprocess translation"
   },
   "changePasswordModal": {
     "confirmPassword": "确认新密码",
@@ -1694,7 +1695,8 @@
   "headerActions": {
     "deleteRecording": "删除录音",
     "more": "更多操作",
-    "reprocess": "重新处理"
+    "reprocess": "重新处理",
+    "reprocessTranslation": "Reprocess translation"
   },
   "help": {
     "actions": "操作",
@@ -2076,7 +2078,11 @@
     "summaryReprocessingStarted": "已开始重新处理摘要",
     "summarySaved": "摘要已保存！",
     "tagsReordered": "标签已重新排序",
-    "transcriptionReprocessingStarted": "已开始重新处理转录"
+    "transcriptionReprocessingStarted": "已开始重新处理转录",
+    "translationInProgress": "Translation already in progress",
+    "translationFailed": "Translation failed",
+    "noTranslationToCopy": "No transcription available to copy.",
+    "noTranslationToDownload": "No transcription available to download."
   },
   "metadata": {
     "cancelEdit": "取消",
@@ -2830,7 +2836,10 @@
     "playbackSpeedTapToChange": "播放速度（点按以更改）",
     "switchToBubbleView": "切换到气泡视图",
     "switchToSimpleView": "切换到简单视图",
-    "tagDragToReorder": "{{name}}（拖动以重新排序）"
+    "tagDragToReorder": "{{name}}（拖动以重新排序）",
+    "translateTranscript": "Translate transcript",
+    "reprocessTranslation": "Reprocess translation",
+    "translateTranscriptIncognito": "Translation is unavailable for incognito recordings."
   },
   "transcriptTemplates": {
     "availableTemplates": "可用模板",
@@ -3500,7 +3509,11 @@
       "share_permissions_invalid": "can_edit 和 can_reshare 必须为 true 或 false",
       "share_permissions_required": "请发送 can_edit、can_reshare 或两者",
       "share_update_denied": "只有分享此录音的人才能更改这些权限",
-      "share_source_locked": "此共享来自群组标签或文件夹，其权限由该群组决定"
+      "share_source_locked": "此共享来自群组标签或文件夹，其权限由该群组决定",
+      "translation_no_transcription": "No transcription available for translation.",
+      "translation_blocked_transcription_failed": "Cannot translate: transcription failed. Please reprocess the transcription first.",
+      "translation_llm_not_configured": "Translation service is not available (LLM client not configured)",
+      "translation_invalid_language": "Unknown target language."
     },
     "apiMessage": {
       "accountUpdated": "账户信息已更新！",
@@ -3543,7 +3556,8 @@
       "transcriptionUpdated": "转录已更新。",
       "userAlreadyHasNamingTemplates": "该用户已有命名模板",
       "userAlreadyHasTemplates": "该用户已有模板",
-      "voiceProfileCleared": "已清除 {{name}} 的声纹档案"
+      "voiceProfileCleared": "已清除 {{name}} 的声纹档案",
+      "translationQueued": "Translation queued"
     },
     "form": {
       "required": "此字段为必填项。",
@@ -3679,5 +3693,15 @@
     "emailVerifiedHeading": "邮箱已验证！",
     "emailVerifiedHelp": "您的邮箱地址已成功验证。现在可以登录您的账户了。",
     "continueToLogin": "继续登录"
+  },
+  "translation": {
+    "title": "Translation",
+    "noTranslation": "No translation available",
+    "generate": "Generate",
+    "generateTitle": "Generate translation",
+    "targetLanguage": "Target language",
+    "preferences": "Translation preferences",
+    "toggle": "Toggle translation",
+    "incognitoUnavailable": "Translation is unavailable for incognito recordings."
   }
 }

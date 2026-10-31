@@ -174,6 +174,12 @@
                         <i class="fas fa-sync-alt w-4 text-center text-[var(--text-muted)]"></i>
                         <span v-text="t('buttons.reprocessSummary')"></span>
                     </button>
+                    <button v-if="selectedRecording.can_edit !== false && (selectedRecording.status === 'COMPLETED' || selectedRecording.status === 'FAILED') && selectedRecording.transcription && !selectedRecording.incognito"
+                            role="menuitem" @click="showHeaderReprocessMenu = false; translationTargetLanguage = selectedRecording.transcription_translation_language || ''; showTranslationModal = true"
+                            class="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-[var(--bg-tertiary)] transition-colors whitespace-nowrap">
+                        <i class="fas fa-language w-4 text-center text-[var(--text-muted)]"></i>
+                        <span v-text="t('buttons.reprocessTranslation')"></span>
+                    </button>
                     <button v-if="['PENDING', 'QUEUED', 'PROCESSING', 'SUMMARIZING', 'FAILED'].includes(selectedRecording.status)"
                             role="menuitem" @click="showHeaderReprocessMenu = false; confirmReset(selectedRecording)"
                             class="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-[var(--bg-tertiary)] transition-colors whitespace-nowrap" style="color: rgb(249, 115, 22);">

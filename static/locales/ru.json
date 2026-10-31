@@ -923,7 +923,8 @@
     "saveFolder": "Сохранить папку",
     "send": "Отправить",
     "addParticipant": "Добавить участника",
-    "deleteShareLink": "Удалить ссылку"
+    "deleteShareLink": "Удалить ссылку",
+    "reprocessTranslation": "Reprocess translation"
   },
   "changePasswordModal": {
     "confirmPassword": "Подтвердите новый пароль",
@@ -1694,7 +1695,8 @@
   "headerActions": {
     "deleteRecording": "Удалить запись",
     "more": "Другие действия",
-    "reprocess": "Обработать заново"
+    "reprocess": "Обработать заново",
+    "reprocessTranslation": "Reprocess translation"
   },
   "help": {
     "actions": "Действия",
@@ -2076,7 +2078,11 @@
     "summaryReprocessingStarted": "Повторная обработка резюме запущена",
     "summarySaved": "Резюме сохранено!",
     "tagsReordered": "Порядок тегов изменён",
-    "transcriptionReprocessingStarted": "Повторная обработка транскрипции запущена"
+    "transcriptionReprocessingStarted": "Повторная обработка транскрипции запущена",
+    "translationInProgress": "Translation already in progress",
+    "translationFailed": "Translation failed",
+    "noTranslationToCopy": "No transcription available to copy.",
+    "noTranslationToDownload": "No transcription available to download."
   },
   "metadata": {
     "cancelEdit": "Отмена",
@@ -2830,7 +2836,10 @@
     "playbackSpeedTapToChange": "Скорость воспроизведения (нажмите, чтобы изменить)",
     "switchToBubbleView": "Переключить на вид «пузыри»",
     "switchToSimpleView": "Переключить на простой вид",
-    "tagDragToReorder": "{{name}} (перетащите, чтобы изменить порядок)"
+    "tagDragToReorder": "{{name}} (перетащите, чтобы изменить порядок)",
+    "translateTranscript": "Translate transcript",
+    "reprocessTranslation": "Reprocess translation",
+    "translateTranscriptIncognito": "Translation is unavailable for incognito recordings."
   },
   "transcriptTemplates": {
     "availableTemplates": "Доступные шаблоны",
@@ -3500,7 +3509,11 @@
       "share_permissions_invalid": "can_edit и can_reshare должны быть true или false",
       "share_permissions_required": "Укажите can_edit, can_reshare или оба",
       "share_update_denied": "Изменить эти права может только тот, кто поделился этой записью",
-      "share_source_locked": "Этот доступ выдан через тег или папку группы, и его права определяются этой группой"
+      "share_source_locked": "Этот доступ выдан через тег или папку группы, и его права определяются этой группой",
+      "translation_no_transcription": "No transcription available for translation.",
+      "translation_blocked_transcription_failed": "Cannot translate: transcription failed. Please reprocess the transcription first.",
+      "translation_llm_not_configured": "Translation service is not available (LLM client not configured)",
+      "translation_invalid_language": "Unknown target language."
     },
     "apiMessage": {
       "accountUpdated": "Данные учётной записи обновлены!",
@@ -3543,7 +3556,8 @@
       "transcriptionUpdated": "Транскрипция обновлена.",
       "userAlreadyHasNamingTemplates": "У пользователя уже есть шаблоны именования",
       "userAlreadyHasTemplates": "У пользователя уже есть шаблоны",
-      "voiceProfileCleared": "Голосовой профиль {{name}} очищен"
+      "voiceProfileCleared": "Голосовой профиль {{name}} очищен",
+      "translationQueued": "Translation queued"
     },
     "form": {
       "required": "Это поле обязательно.",
@@ -3679,5 +3693,15 @@
     "emailVerifiedHeading": "Email подтверждён!",
     "emailVerifiedHelp": "Адрес электронной почты подтверждён. Теперь вы можете войти в учётную запись.",
     "continueToLogin": "Перейти ко входу"
+  },
+  "translation": {
+    "title": "Translation",
+    "noTranslation": "No translation available",
+    "generate": "Generate",
+    "generateTitle": "Generate translation",
+    "targetLanguage": "Target language",
+    "preferences": "Translation preferences",
+    "toggle": "Toggle translation",
+    "incognitoUnavailable": "Translation is unavailable for incognito recordings."
   }
 }

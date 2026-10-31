@@ -19,6 +19,7 @@ const t = (key, params) => (window.i18n ? window.i18n.t(key, params) : key);
 export function useTranscription(state, utils) {
     const {
         showTextEditorModal, showAsrEditorModal, selectedRecording,
+        viewingTranslation,
         editingTranscriptionContent, editingSegments, availableSpeakers,
         recordings, dropdownPositions, openAsrDropdownIndex,
         asrEditorRef, asrEditorSaveFlash, asrEditorHighlightIndex, editorAutosave
@@ -31,6 +32,9 @@ export function useTranscription(state, utils) {
     // =========================================
 
     const openTranscriptionEditor = () => {
+        if (viewingTranslation.value) {
+            return;
+        }
         if (!selectedRecording.value || !selectedRecording.value.transcription) {
             return;
         }
