@@ -11,7 +11,6 @@ issues with LLM-generated JSON, including:
 
 import json
 import re
-import ast
 import logging
 
 # Module-level logger
@@ -206,6 +205,9 @@ def safe_json_loads(json_string, fallback_value=None):
     """
     Safely parse JSON with preprocessing to handle common LLM JSON formatting issues.
 
+    Only JSON is accepted: every strategy goes through json.loads, and no
+    Python literal is evaluated (#532).
+
     Args:
         json_string (str): The JSON string to parse
         fallback_value: Value to return if parsing fails (default: None)
@@ -233,13 +235,10 @@ def safe_json_loads(json_string, fallback_value=None):
         # Strategy 2: Fix common escape issues
         lambda x: json.loads(preprocess_json_escapes(x)),
 
-        # Strategy 3: Use ast.literal_eval as fallback for simple cases
-        lambda x: ast.literal_eval(x) if x.startswith(('{', '[')) else None,
-
-        # Strategy 4: Extract JSON object/array using regex
+        # Strategy 3: Extract JSON object/array using regex
         lambda x: json.loads(extract_json_object(x)),
 
-        # Strategy 5: Auto-close incomplete JSON and parse
+        # Strategy 4: Auto-close incomplete JSON and parse
         lambda x: json.loads(auto_close_json(x)),
     ]
 

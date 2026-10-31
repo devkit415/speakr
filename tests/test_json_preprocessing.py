@@ -168,11 +168,10 @@ This should help with your transcription needs.'''
     def test_fallback_strategies(self):
         """Test that different parsing strategies work as fallbacks."""
         
-        # Test ast.literal_eval fallback for simple cases
+        # A Python literal is not JSON and is not evaluated (#532)
         simple_dict = "{'title': 'Simple', 'summary': 'Test'}"
-        result = safe_json_loads(simple_dict)
-        expected = {"title": "Simple", "summary": "Test"}
-        self.assertEqual(result, expected)
+        result = safe_json_loads(simple_dict, fallback_value="fallback")
+        self.assertEqual(result, "fallback")
         
         # Test regex extraction fallback
         messy_response = 'Some text before {"title": "Extracted", "summary": "From regex"} some text after'
