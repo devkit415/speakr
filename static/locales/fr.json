@@ -3111,7 +3111,6 @@
       "ssoNotLinked": "Votre compte n'est pas lié au SSO.",
       "ssoUnlinkNoPassword": "Impossible de délier le SSO : aucun mot de passe n'est défini. Utilisez le lien « Mot de passe oublié » de la page de connexion avec votre adresse e-mail pour recevoir un lien permettant de définir un mot de passe.",
       "ssoUnlinked": "Compte SSO délié avec succès.",
-      "useSsoLogin": "Ce compte utilise la connexion SSO. Veuillez vous connecter avec le SSO.",
       "userNotFound": "Utilisateur introuvable.",
       "verificationCooldown": "Veuillez patienter {{seconds}} secondes avant de demander un nouvel e-mail de vérification.",
       "verificationLinkInvalid": "Le lien de vérification est invalide ou a expiré.",

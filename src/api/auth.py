@@ -292,6 +292,20 @@ def _password_accepted(user, password):
     return False
 
 
+_dummy_password_hash = None
+
+
+def _dummy_password_check(password):
+    """Run a bcrypt check of the same cost as a real one, for a sign-in with no
+    local password to compare against (#534), so the response time does not
+    show whether the address is registered. Always returns False."""
+    global _dummy_password_hash
+    if _dummy_password_hash is None:
+        _dummy_password_hash = bcrypt.generate_password_hash(os.urandom(16).hex()).decode('utf-8')
+    bcrypt.check_password_hash(_dummy_password_hash, password or '')
+    return False
+
+
 @auth_bp.route('/login', methods=['GET', 'POST'])
 @rate_limit("10 per minute")
 def login():
@@ -308,32 +322,33 @@ def login():
     form = LoginForm()
     if form.validate_on_submit():
         user = User.find_by_email(form.email.data)
+        # Every attempt pays for one bcrypt check and gets the same message,
+        # whether or not the account exists or has a local password (#534).
         if user and user.password:
-            # Check if password login is disabled for non-admins
-            if password_login_disabled and not user.is_admin:
-                flash(translate('server.flash.passwordLoginDisabled'), 'warning')
-            elif not _password_accepted(user, form.password.data):
-                flash(translate('server.flash.loginFailed'), 'danger')
-            else:
-                # Check email verification if required
-                if is_email_verification_required() and not user.email_verified:
-                    # Store user email in session for resend functionality
-                    session['unverified_email'] = user.email
-                    return render_template('auth/check_email.html',
-                                         title='Email Verification Required',
-                                         email=user.email,
-                                         action='verification_required',
-                                         show_resend=True)
-
-                login_user(user, remember=form.remember.data)
-                next_page = request.args.get('next')
-                if not is_safe_url(next_page):
-                    return redirect(url_for('recordings.index'))
-                return redirect(next_page) if next_page else redirect(url_for('recordings.index'))
-        elif user and not user.password:
-            flash(translate('server.flash.useSsoLogin'), 'warning')
+            accepted = _password_accepted(user, form.password.data)
         else:
+            accepted = _dummy_password_check(form.password.data)
+        if password_login_disabled and not (accepted and user.is_admin):
+            # Only an admin with the correct password gets past this.
+            flash(translate('server.flash.passwordLoginDisabled'), 'warning')
+        elif not accepted:
             flash(translate('server.flash.loginFailed'), 'danger')
+        else:
+            # Check email verification if required
+            if is_email_verification_required() and not user.email_verified:
+                # Store user email in session for resend functionality
+                session['unverified_email'] = user.email
+                return render_template('auth/check_email.html',
+                                     title='Email Verification Required',
+                                     email=user.email,
+                                     action='verification_required',
+                                     show_resend=True)
+
+            login_user(user, remember=form.remember.data)
+            next_page = request.args.get('next')
+            if not is_safe_url(next_page):
+                return redirect(url_for('recordings.index'))
+            return redirect(next_page) if next_page else redirect(url_for('recordings.index'))
 
     return render_template(
         'login.html',

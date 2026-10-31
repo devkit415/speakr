@@ -3111,7 +3111,6 @@
       "ssoNotLinked": "Su cuenta no está vinculada a SSO.",
       "ssoUnlinkNoPassword": "No se puede desvincular SSO: no tiene una contraseña establecida. Use el enlace «¿Olvidó su contraseña?» de la página de inicio de sesión con su dirección de correo para recibir un enlace que le permita establecer una contraseña.",
       "ssoUnlinked": "Cuenta SSO desvinculada correctamente.",
-      "useSsoLogin": "Esta cuenta usa inicio de sesión SSO. Inicie sesión con SSO.",
       "userNotFound": "Usuario no encontrado.",
       "verificationCooldown": "Espere {{seconds}} segundos antes de solicitar otro correo de verificación.",
       "verificationLinkInvalid": "El enlace de verificación no es válido o ha caducado.",

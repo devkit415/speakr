@@ -219,14 +219,83 @@ def test_login_succeeds_when_email_verified(cleanup_users):
             assert s.get('_user_id') == str(user.id)
 
 
-def test_login_sso_only_user_prompted_to_use_sso(cleanup_users):
-    # User with no local password → account uses SSO, password login refused.
+LOGIN_FAILED = "Login unsuccessful. Please check email and password."
+PASSWORD_LOGIN_DISABLED = "Password login is disabled. Please sign in with SSO."
+
+
+def _post_login(email, password):
+    """POST /login, counting bcrypt checks (#534)."""
+    real = auth_mod.bcrypt.check_password_hash
+    with mock.patch.object(auth_mod.bcrypt, 'check_password_hash', side_effect=real) as check:
+        client = app.test_client()
+        resp = client.post('/login', data={'email': email, 'password': password})
+        with client.session_transaction() as s:
+            signed_in = '_user_id' in s
+    return resp, check, signed_in
+
+
+def test_login_sso_only_user_gets_the_generic_failure(cleanup_users):
+    # User with no local password: password login refused with the same
+    # message and the same bcrypt cost as an unknown address (#534).
     user = _mk_user(cleanup_users, password=None, sso_subject="sub-" + uuid.uuid4().hex)
-    client = app.test_client()
-    resp = client.post('/login', data={'email': user.email, 'password': GOOD_PW})
+    resp, check, signed_in = _post_login(user.email, GOOD_PW)
     assert resp.status_code == 200
-    with client.session_transaction() as s:
-        assert '_user_id' not in s
+    assert not signed_in
+    assert LOGIN_FAILED in resp.get_data(as_text=True)
+    assert check.call_count == 1
+
+
+def test_login_unknown_email_runs_one_password_check(cleanup_users):
+    resp, check, signed_in = _post_login(uuid.uuid4().hex[:8] + '@nobody.com', GOOD_PW)
+    assert not signed_in
+    assert LOGIN_FAILED in resp.get_data(as_text=True)
+    assert check.call_count == 1
+
+
+def test_login_wrong_password_checks_the_stored_hash(cleanup_users):
+    user = _mk_user(cleanup_users)
+    resp, check, signed_in = _post_login(user.email, 'wrong-password')
+    assert not signed_in
+    assert LOGIN_FAILED in resp.get_data(as_text=True)
+    assert check.call_count == 1
+    assert check.call_args.args[0] == user.password
+
+
+@contextlib.contextmanager
+def _password_login_disabled():
+    with mock.patch.object(auth_mod, 'is_sso_enabled', return_value=True), \
+         mock.patch.object(auth_mod, 'get_sso_config',
+                           return_value={'disable_password_login': True, 'provider_name': 'SSO'}), \
+         mock.patch.object(auth_mod, 'init_sso_client', return_value=None):
+        yield
+
+
+@pytest.mark.parametrize("who", ["unknown", "sso_only", "user_right_pw", "user_wrong_pw", "admin_wrong_pw"])
+def test_password_login_disabled_answers_everyone_alike(cleanup_users, who):
+    # With password login disabled, only an admin with the correct password
+    # signs in; every other attempt gets the same message (#534).
+    if who == "unknown":
+        email, pw = uuid.uuid4().hex[:8] + '@nobody.com', GOOD_PW
+    elif who == "sso_only":
+        email, pw = _mk_user(cleanup_users, password=None, sso_subject="sub-" + uuid.uuid4().hex).email, GOOD_PW
+    elif who == "admin_wrong_pw":
+        email, pw = _mk_user(cleanup_users, is_admin=True).email, 'wrong-password'
+    else:
+        email = _mk_user(cleanup_users).email
+        pw = GOOD_PW if who == "user_right_pw" else 'wrong-password'
+    with _password_login_disabled():
+        resp, check, signed_in = _post_login(email, pw)
+    assert not signed_in
+    assert PASSWORD_LOGIN_DISABLED in resp.get_data(as_text=True)
+    assert check.call_count == 1
+
+
+def test_password_login_disabled_still_admits_an_admin(cleanup_users):
+    admin = _mk_user(cleanup_users, is_admin=True)
+    with _password_login_disabled():
+        resp, check, signed_in = _post_login(admin.email, GOOD_PW)
+    assert resp.status_code == 302
+    assert signed_in
 
 
 # ---------------------------------------------------------------------------

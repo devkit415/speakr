@@ -3111,7 +3111,6 @@
       "ssoNotLinked": "Your account is not linked to SSO.",
       "ssoUnlinkNoPassword": "Cannot unlink SSO: you have no password set. Use the Forgot Password link on the login page with your email address to receive a reset link that lets you set a password.",
       "ssoUnlinked": "SSO account unlinked successfully.",
-      "useSsoLogin": "This account uses SSO login. Please sign in with SSO.",
       "userNotFound": "User not found.",
       "verificationCooldown": "Please wait {{seconds}} seconds before requesting another verification email.",
       "verificationLinkInvalid": "The verification link is invalid or has expired.",

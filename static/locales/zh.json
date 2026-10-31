@@ -3111,7 +3111,6 @@
       "ssoNotLinked": "您的账户未关联 SSO。",
       "ssoUnlinkNoPassword": "无法解除 SSO 关联：您尚未设置密码。请在登录页面使用“忘记密码”链接并输入您的邮箱地址，以获取用于设置密码的链接。",
       "ssoUnlinked": "SSO 账户已解除关联。",
-      "useSsoLogin": "此账户使用 SSO 登录。请使用 SSO 登录。",
       "userNotFound": "未找到用户。",
       "verificationCooldown": "请等待 {{seconds}} 秒后再申请新的验证邮件。",
       "verificationLinkInvalid": "验证链接无效或已过期。",

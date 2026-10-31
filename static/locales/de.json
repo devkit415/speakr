@@ -3111,7 +3111,6 @@
       "ssoNotLinked": "Ihr Konto ist nicht mit SSO verknüpft.",
       "ssoUnlinkNoPassword": "SSO kann nicht getrennt werden: Für Ihr Konto ist kein Passwort festgelegt. Verwenden Sie den Link „Passwort vergessen“ auf der Anmeldeseite mit Ihrer E-Mail-Adresse, um einen Link zum Festlegen eines Passworts zu erhalten.",
       "ssoUnlinked": "SSO-Konto erfolgreich getrennt.",
-      "useSsoLogin": "Dieses Konto verwendet die SSO-Anmeldung. Bitte melden Sie sich mit SSO an.",
       "userNotFound": "Benutzer nicht gefunden.",
       "verificationCooldown": "Bitte warten Sie {{seconds}} Sekunden, bevor Sie eine weitere Bestätigungs-E-Mail anfordern.",
       "verificationLinkInvalid": "Der Bestätigungslink ist ungültig oder abgelaufen.",
