@@ -2336,7 +2336,8 @@ def ingest_uploaded_recording(
             except Exception as e:
                 current_app.logger.warning(f"Could not get connector specs for upload: {e}")
 
-        # Skip size check if chunking is enabled (app-level or connector handles internally)
+        # Chunking (app-level, or inside the connector) lifts the per-type
+        # policy cap; the WSGI ceiling below always applies (#533).
         should_enforce_size_limit = True
         if chunking_service:
             from src.audio_chunking import get_effective_chunking_config
@@ -2351,13 +2352,14 @@ def ingest_uploaded_recording(
                     current_app.logger.info(f"Duration-based chunking enabled ({chunking_config.limit_value}s, source={chunking_config.source}) - skipping {original_file_size/1024/1024:.1f}MB size limit check")
 
         # Two ceilings to consider. The Werkzeug `max_content_length` is
-        # the WSGI hard cap; the smaller `effective_limit_bytes` is the
-        # per-request policy cap (which differs between regular and
-        # audio-only-video uploads). Reject if EITHER fires.
-        if should_enforce_size_limit and (
-            (max_content_length and original_file_size > max_content_length)
-            or original_file_size > effective_limit_bytes
-        ):
+        # the WSGI hard cap; Werkzeug enforces it as well, and it is checked
+        # here on every upload whatever the chunking setting (#533). The
+        # smaller `effective_limit_bytes` is the per-request policy cap
+        # (which differs between regular and audio-only-video uploads), and
+        # chunking lifts it.
+        if max_content_length and original_file_size > max_content_length:
+            raise RequestEntityTooLarge()
+        if should_enforce_size_limit and original_file_size > effective_limit_bytes:
             raise RequestEntityTooLarge()
 
         # Storage quota (#413). A recording made in this browser was checked

@@ -25,7 +25,7 @@ Two separate caps apply depending on file type:
 - **`max_file_size_mb`** (default 300 MB) — applies to audio uploads. Protects storage from runaway audio.
 - **`max_audio_only_video_size_mb`** (default 4 × `max_file_size_mb`, ≈ 1200 MB) — applies to **any** video file regardless of whether the video stream will be kept. Video files are typically much larger than the audio they contain, so they get their own (larger) ceiling.
 
-When chunking is enabled (`ENABLE_CHUNKING=true`, the default), the upload route lets files through above these caps and chunks them on the server for the ASR call. When chunking is off, the caps are enforced strictly. Files whose **extracted audio** still exceeds `max_file_size_mb` are rejected with a clear error when chunking is off; with chunking on, the chunking pipeline handles them.
+When chunking is enabled (`ENABLE_CHUNKING=true`, the default), the upload route lets files through above these caps and chunks them on the server for the ASR call. An upload larger than the higher of the two caps is refused in either case. When chunking is off, the caps are enforced strictly. Files whose **extracted audio** still exceeds `max_file_size_mb` are rejected with a clear error when chunking is off; with chunking on, the chunking pipeline handles them.
 
 The "Keep audio only" toggle on the upload form determines whether the video stream is retained — it no longer affects the size cap (that's controlled by file type). Use it when you specifically don't want the video kept on disk.
 
