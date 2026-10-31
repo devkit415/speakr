@@ -320,6 +320,17 @@ def _has_transcript_content(transcription):
     return True
 
 
+class RecordingDeletedDuringJob(Exception):
+    """The recording was deleted while its job ran (#531)."""
+
+
+def _recording_deleted(recording_id):
+    """True when the recording's row is gone, checked without flushing the
+    session's pending changes to it (#531)."""
+    with db.session.no_autoflush:
+        return db.session.query(Recording.id).filter_by(id=recording_id).first() is None
+
+
 def _end_transaction_before_external_call(*instances):
     """End the open database transaction before a long outside call (#405).
 
@@ -2168,12 +2179,16 @@ def transcribe_with_connector(app_context, recording_id, filepath, original_file
                         # The new labels are a new diarization: voice samples and
                         # the label -> name map of the previous run no longer
                         # apply, and the embeddings carry the backend's space.
+                        # A recording deleted during the ASR call cannot be
+                        # updated; stop here and leave the job to the runner.
+                        if _recording_deleted(recording_id):
+                            raise RecordingDeletedDuringJob(recording_id)
                         try:
                             from src.services.voice_profiles import current_space_id, forget_recording_samples
                             forget_recording_samples(recording)
                             recording.speaker_embeddings_space_id = current_space_id() if recording.speaker_embeddings else None
                         except Exception as vp_err:
-                            current_app.logger.warning(f"Could not reset voice samples for recording {recording.id}: {vp_err}")
+                            current_app.logger.warning(f"Could not reset voice samples for recording {recording_id}: {vp_err}")
 
                     # If we reach here, transcription succeeded
                     break
@@ -2400,6 +2415,10 @@ def transcribe_with_connector(app_context, recording_id, filepath, original_file
 
         except Exception as e:
             db.session.rollback()
+            if isinstance(e, RecordingDeletedDuringJob) or _recording_deleted(recording_id):
+                # Not a failure: the runner drops the job (#531).
+                current_app.logger.info(f"Recording {recording_id} was deleted during transcription; stopping")
+                raise
             error_msg = str(e)
             error_type = type(e).__name__
             current_app.logger.error(f"Connector transcription FAILED for recording {recording_id}: [{error_type}] {error_msg}", exc_info=True)
