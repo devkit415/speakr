@@ -235,6 +235,22 @@ def test_a_text_edit_clears_the_translation(user):
         assert rec.translation_duration_seconds is None
 
 
+def test_a_text_edit_clears_a_translation_of_text_keyed_segments(user):
+    def rows(first):
+        return json.dumps([{"speaker": "A", "text": first}, {"speaker": "B", "text": "Good morning"}])
+    with app.app_context():
+        rec = Recording(user_id=user, status='COMPLETED', transcription=rows("Hello there"),
+                        transcription_translation=json.dumps([{"speaker": "A", "text": "Hola"},
+                                                              {"speaker": "B", "text": "Buenos días"}]),
+                        transcription_translation_language='Spanish')
+        db.session.add(rec)
+        db.session.commit()
+        rec.transcription = rows("Hello there, friend")
+        db.session.commit()
+        db.session.refresh(rec)
+        assert rec.transcription_translation is None
+
+
 def test_reprocessing_clears_the_translation(user):
     with app.app_context():
         rec = _recording(user)

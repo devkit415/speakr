@@ -441,6 +441,11 @@ def _segment_list(text):
     return None
 
 
+def _segment_text(segment):
+    # Segments keep their text under 'sentence'; some imports use 'text'.
+    return segment.get('sentence', segment.get('text'))
+
+
 def reconcile_translation(recording, previous_transcription):
     """Bring a stored translation in line with a changed transcript.
 
@@ -456,7 +461,7 @@ def reconcile_translation(recording, previous_transcription):
     translated = _segment_list(recording.transcription_translation)
     if (old is not None and new is not None and translated is not None
             and len(old) == len(new) == len(translated)
-            and all(o.get('sentence') == n.get('sentence') for o, n in zip(old, new))):
+            and all(_segment_text(o) == _segment_text(n) for o, n in zip(old, new))):
         synced = []
         for segment, source in zip(translated, new):
             segment = dict(segment)
