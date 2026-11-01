@@ -723,7 +723,11 @@ class FairJobQueue:
         """Generate Inquire chunks/embeddings for a recording (embedding worker pool)."""
         from src.database import db
         from src.models import Recording
-        from src.services.embeddings import process_recording_chunks
+        from src.services.embeddings import (
+            process_recording_chunks,
+            USE_API_EMBEDDINGS,
+            LOCAL_EMBEDDINGS_AVAILABLE,
+        )
 
         # A missing recording or one with no transcription is a terminal
         # no-op, not a transient failure: do not raise and let the retry
@@ -731,6 +735,14 @@ class FairJobQueue:
         rec = db.session.get(Recording, recording.id)
         if rec is None or not rec.transcription:
             logger.info(f"Skipping embed_chunks for recording {recording.id}: no recording or transcription")
+            return
+
+        # When no embedding backend is configured at all, chunk generation
+        # can never succeed; treat it as a terminal skip instead of a
+        # retryable failure so the recording stays COMPLETED without a
+        # spurious "Processing Error".
+        if not (USE_API_EMBEDDINGS or LOCAL_EMBEDDINGS_AVAILABLE):
+            logger.info(f"Skipping embed_chunks for recording {recording.id}: embeddings not available")
             return
 
         ok = process_recording_chunks(recording.id)
