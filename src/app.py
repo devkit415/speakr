@@ -628,6 +628,8 @@ def _rate_limit_exceeded(e):
     resp.headers["Retry-After"] = str(retry)
     return resp
 
+_AUDIO_PATH = re.compile(r'/audio/\d+')
+
 # Exempt frequently-polled status endpoints from rate limiting
 @limiter.request_filter
 def exempt_status_endpoints():
@@ -652,6 +654,17 @@ def exempt_status_endpoints():
     # so IP-based rate limiting is the wrong control here.
     if request.path.startswith('/upload/session'):
         return True
+    # Exempt media playback for signed-in users (#539). A browser reads a
+    # recording through HTTP range requests, and a fragmented MP4 (the format
+    # OBS writes) costs one request per fragment on load and on every seek:
+    # a 30-minute video used 700+ requests, enough to exhaust the hourly IP
+    # limit and block playback of every recording for up to an hour. The
+    # route is login-protected and access-checked; the public share route
+    # keeps its limit.
+    if request.method == 'GET' and _AUDIO_PATH.fullmatch(request.path):
+        from flask_login import current_user
+        if current_user.is_authenticated:
+            return True
     return False
 
 csrf = CSRFProtect(app)

@@ -238,6 +238,29 @@ def test_recording_session_chunk_uploads_are_rate_limit_exempt():
         assert exempt_status_endpoints() is not True
 
 
+
+def test_signed_in_media_playback_is_rate_limit_exempt():
+    """A fragmented MP4 is read through hundreds of range requests, so the
+    signed-in media route must not count against the global IP limit (#539).
+    Anonymous requests and the public share route keep the limit."""
+    from unittest.mock import patch
+    from src.app import exempt_status_endpoints
+
+    class _User:
+        def __init__(self, authenticated):
+            self.is_authenticated = authenticated
+
+    with patch("flask_login.utils._get_user", return_value=_User(True)):
+        with app.test_request_context("/audio/2371", method="GET"):
+            assert exempt_status_endpoints() is True
+        with app.test_request_context("/audio/2371/extra", method="GET"):
+            assert exempt_status_endpoints() is not True
+        with app.test_request_context("/share/audio/abc123", method="GET"):
+            assert exempt_status_endpoints() is not True
+    with patch("flask_login.utils._get_user", return_value=_User(False)):
+        with app.test_request_context("/audio/2371", method="GET"):
+            assert exempt_status_endpoints() is not True
+
 if __name__ == "__main__":
     failures = 0
     for name, fn in sorted(globals().items()):
