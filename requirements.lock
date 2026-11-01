@@ -96,13 +96,13 @@ blinker==1.9.0 \
     --hash=sha256:b4ce2265a7abece45e7cc896e98dbebe6cead56bcf805a3d23136d145f5445bf \
     --hash=sha256:ba0efaa9080b619ff2f3459d1d500c57bddea4a6b424b60a91141db6fd2f08bc
     # via flask
-boto3==1.43.111 \
-    --hash=sha256:5ae342a16c848909cd42d4be404f69d9082e5705460198d4d3327eca5f6cddcb \
-    --hash=sha256:c79994619c8d89e45f6fd0edc5c5b5a70c9358f00423f4c99cb64931f89ecf37
+boto3==1.43.118 \
+    --hash=sha256:ab8f3d2c622ef039338b4f228d97ea55f1abd573d84bb9b9a5ee8cb6780c0ccd \
+    --hash=sha256:c0620f799e0f0c222ba42c337b65cdbcd3da38a3121187f634d8926cbbb28a9c
     # via -r requirements.txt
-botocore==1.43.111 \
-    --hash=sha256:44d5e80962ac6cb9e85af72667b77c9586451e3328ab0ce33195380767e213d8 \
-    --hash=sha256:f1f4c28cb2a096bf246d0bb24cbb1a01c5cb696ef499fa71b155adda7b94c90b
+botocore==1.43.118 \
+    --hash=sha256:7f3f9d88cc9e847587690f82a42e3c3c292c3026c92c1e60d68a9310018e003f \
+    --hash=sha256:a45d7ae570674161e4a3542d8c68633bf7503f92d1de781ef7361b79488eda6f
     # via
     #   boto3
     #   s3transfer
@@ -1159,9 +1159,9 @@ numpy==1.24.3 \
     #   -r requirements.txt
     #   scikit-learn
     #   scipy
-openai==3.36.1 \
-    --hash=sha256:4c15b6765fe1792c5ad753556f44c7f82c2920c5e9e40219c0fca97369e923d3 \
-    --hash=sha256:ad8e5d56f20198915d98726ac1edb12ae38e7ecfa9bd560057e84642168b20c9
+openai==3.37.0 \
+    --hash=sha256:670bd6f699000d43a2073bcf94374a55bb133bfe5de0d084d47eb9bb9f6a8e5d \
+    --hash=sha256:d9f5b000f52397a7f9f946012744c5bc4c962eed3c100385252464c273a63e57
     # via -r requirements.txt
 ordered-set==4.1.0 \
     --hash=sha256:046e1132c71fcf3330438a539928932caf51ddbc582496833e23de611de14562 \
