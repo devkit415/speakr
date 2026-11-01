@@ -1791,7 +1791,7 @@ def test_reindex_chunks_noop_when_inquire_disabled(owner):
     with _db():
         with patch.object(rec_module, "ENABLE_INQUIRE_MODE", False), \
              patch.object(rec_module, "process_recording_chunks") as proc, \
-             patch.object(rec_module.threading, "Thread") as thread_cls:
+             patch.object(rec_module, "job_queue") as jq:
             rec_module.reindex_recording_chunks_async(987654321)
-            thread_cls.assert_not_called()
+            jq.enqueue.assert_not_called()
             proc.assert_not_called()

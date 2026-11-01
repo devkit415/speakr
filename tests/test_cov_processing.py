@@ -171,10 +171,12 @@ def test_summary_inquire_mode_calls_process_chunks():
         rid = rec.id
         with _patch_llm(content="A real summary body."), \
              patch.object(proc, "ENABLE_INQUIRE_MODE", True), \
-             patch.object(proc, "process_recording_chunks") as mock_chunks:
+             patch.object(proc, "job_queue") as mock_job_queue:
             proc.generate_summary_only_task(app.app_context(), rid)
 
-        mock_chunks.assert_called_once_with(rid)
+        mock_job_queue.enqueue.assert_called_once()
+        assert mock_job_queue.enqueue.call_args.kwargs.get("job_type") == "embed_chunks"
+        assert mock_job_queue.enqueue.call_args.kwargs.get("recording_id") == rid
 
 
 def test_summary_inquire_chunk_error_is_swallowed():
@@ -184,8 +186,8 @@ def test_summary_inquire_chunk_error_is_swallowed():
         rid = rec.id
         with _patch_llm(content="A real summary body."), \
              patch.object(proc, "ENABLE_INQUIRE_MODE", True), \
-             patch.object(proc, "process_recording_chunks",
-                          side_effect=RuntimeError("embed fail")):
+             patch.object(proc, "job_queue") as mock_job_queue:
+            mock_job_queue.enqueue.side_effect = RuntimeError("embed fail")
             # Must not raise despite the chunk error.
             proc.generate_summary_only_task(app.app_context(), rid)
 
@@ -309,9 +311,11 @@ def test_title_inquire_mode_calls_process_chunks():
         rid = rec.id
         with _patch_llm(content="Inquire Title"), \
              patch.object(proc, "ENABLE_INQUIRE_MODE", True), \
-             patch.object(proc, "process_recording_chunks") as mock_chunks:
+             patch.object(proc, "job_queue") as mock_job_queue:
             proc.generate_title_task(app.app_context(), rid, will_auto_summarize=False)
-        mock_chunks.assert_called_once_with(rid)
+        mock_job_queue.enqueue.assert_called_once()
+        assert mock_job_queue.enqueue.call_args.kwargs.get("job_type") == "embed_chunks"
+        assert mock_job_queue.enqueue.call_args.kwargs.get("recording_id") == rid
 
 
 def test_title_user_provided_title_is_kept():

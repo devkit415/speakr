@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 # Configuration
 TRANSCRIPTION_WORKERS = int(os.environ.get('JOB_QUEUE_WORKERS', '2'))
 SUMMARY_WORKERS = int(os.environ.get('SUMMARY_QUEUE_WORKERS', '2'))
+EMBEDDING_WORKERS = int(os.environ.get('EMBEDDING_QUEUE_WORKERS', '2'))
 MAX_RETRIES = int(os.environ.get('JOB_MAX_RETRIES', '3'))
 POLL_INTERVAL = 1.0  # seconds between checking for new jobs
 
@@ -37,6 +38,29 @@ POLL_INTERVAL = 1.0  # seconds between checking for new jobs
 # membership in this list is the single source of truth for the whole pipeline.
 TRANSCRIPTION_JOBS = ['transcribe', 'reprocess_transcription', 'stitch', 'merge']
 SUMMARY_JOBS = ['summarize', 'reprocess_summary', 'translate_transcription']
+EMBEDDING_JOBS = ['embed_chunks']
+
+# Job types that must not mutate recording status or emit completion/failure
+# webhooks and emails (translation and embedding work runs beside a recording
+# that is already COMPLETED).
+NON_MUTATING_JOB_TYPES = ('translate_transcription', 'embed_chunks')
+
+
+def queue_name_for_job_type(job_type):
+    """Return the queue name ('transcription', 'summary' or 'embedding') for a job type."""
+    if job_type in SUMMARY_JOBS:
+        return 'summary'
+    if job_type in EMBEDDING_JOBS:
+        return 'embedding'
+    return 'transcription'
+
+
+def job_types_for_queue_name(queue_name):
+    """Return the list of job types belonging to a queue name."""
+    return {
+        'summary': SUMMARY_JOBS,
+        'embedding': EMBEDDING_JOBS,
+    }.get(queue_name, TRANSCRIPTION_JOBS)
 
 
 class FairJobQueue:
@@ -66,11 +90,13 @@ class FairJobQueue:
 
         self._transcription_workers = []
         self._summary_workers = []
+        self._embedding_workers = []
         self._running = False
         self._app = None
         # Separate round-robin tracking for each queue
         self._last_user_id_transcription = None
         self._last_user_id_summary = None
+        self._last_user_id_embedding = None
         # Lock for claiming jobs (SQLite doesn't support row-level locking)
         self._claim_lock = threading.Lock()
         # Serialise the check-then-insert in enqueue(). The active-job unique
@@ -81,7 +107,7 @@ class FairJobQueue:
         self._is_owner = False
         self._initialized = True
 
-        logger.info(f"FairJobQueue initialized: {TRANSCRIPTION_WORKERS} transcription workers, {SUMMARY_WORKERS} summary workers")
+        logger.info(f"FairJobQueue initialized: {TRANSCRIPTION_WORKERS} transcription workers, {SUMMARY_WORKERS} summary workers, {EMBEDDING_WORKERS} embedding workers")
 
     def init_app(self, app):
         """Initialize with Flask app for context management."""
@@ -136,15 +162,27 @@ class FairJobQueue:
             worker.start()
             self._summary_workers.append(worker)
 
-        logger.info(f"Started {TRANSCRIPTION_WORKERS} transcription workers and {SUMMARY_WORKERS} summary workers")
+        # Start embedding workers
+        for i in range(EMBEDDING_WORKERS):
+            worker = threading.Thread(
+                target=self._worker_loop,
+                args=(EMBEDDING_JOBS, 'embedding'),
+                name=f"EmbeddingWorker-{i}",
+                daemon=True
+            )
+            worker.start()
+            self._embedding_workers.append(worker)
+
+        logger.info(f"Started {TRANSCRIPTION_WORKERS} transcription workers, {SUMMARY_WORKERS} summary workers and {EMBEDDING_WORKERS} embedding workers")
 
     def stop(self):
         """Stop the worker threads gracefully."""
         self._running = False
-        for worker in self._transcription_workers + self._summary_workers:
+        for worker in self._transcription_workers + self._summary_workers + self._embedding_workers:
             worker.join(timeout=5)
         self._transcription_workers.clear()
         self._summary_workers.clear()
+        self._embedding_workers.clear()
         logger.info("Job queue workers stopped")
 
     def _worker_loop(self, job_types: List[str], queue_name: str):
@@ -196,9 +234,12 @@ class FairJobQueue:
                     user_ids = [u[0] for u in users_with_jobs]
 
                     # Get last user ID for this queue type
-                    last_user_id = (self._last_user_id_transcription
-                                   if queue_name == 'transcription'
-                                   else self._last_user_id_summary)
+                    if queue_name == 'transcription':
+                        last_user_id = self._last_user_id_transcription
+                    elif queue_name == 'summary':
+                        last_user_id = self._last_user_id_summary
+                    else:
+                        last_user_id = self._last_user_id_embedding
 
                     # Round-robin: pick next user after last processed
                     next_user_id = None
@@ -240,7 +281,7 @@ class FairJobQueue:
                         # Also update Recording.status to reflect active processing
                         from src.models import Recording
                         recording = db.session.get(Recording, candidate_job.recording_id)
-                        if recording and recording.status == 'QUEUED':
+                        if recording and recording.status == 'QUEUED' and candidate_job.job_type not in EMBEDDING_JOBS:
                             recording.status = 'PROCESSING'
 
                         db.session.commit()
@@ -251,8 +292,10 @@ class FairJobQueue:
                         # Update last user ID for this queue
                         if queue_name == 'transcription':
                             self._last_user_id_transcription = next_user_id
-                        else:
+                        elif queue_name == 'summary':
                             self._last_user_id_summary = next_user_id
+                        else:
+                            self._last_user_id_embedding = next_user_id
 
                         wait_time = (claim_time - candidate_job.created_at).total_seconds()
                         logger.info(f"[{queue_name.upper()}] Claimed job {candidate_job.id} (type={candidate_job.job_type}) for user {candidate_job.user_id}, recording {candidate_job.recording_id} (waited {wait_time:.1f}s)")
@@ -368,6 +411,8 @@ class FairJobQueue:
                     self._run_merge(job, recording, params)
                 elif job_type == 'translate_transcription':
                     self._run_translation(job, recording, params)
+                elif job_type == 'embed_chunks':
+                    self._run_embed_chunks(job, recording, params)
                 else:
                     raise ValueError(f"Unknown job type: {job_type}")
 
@@ -384,13 +429,13 @@ class FairJobQueue:
                 # Best-effort: if the webhook subsystem throws, the job is
                 # still marked completed. Translation jobs are excluded from
                 # webhook/email emission per spec.
-                if job_type != 'translate_transcription':
+                if job_type not in NON_MUTATING_JOB_TYPES:
                     try:
                         self._emit_completion_webhook(job_type, recording_id)
                     except Exception as e:
                         logger.warning(f"Webhook emit on job {job_id} completion failed: {e}")
 
-                if job_type != 'translate_transcription':
+                if job_type not in NON_MUTATING_JOB_TYPES:
                     try:
                         self._emit_completion_email(job_type, recording_id)
                     except Exception as e:
@@ -445,7 +490,7 @@ class FairJobQueue:
 
                         # Always keep recordings with FAILED status so users can see the error
                         # and reprocess later (e.g., when ASR server recovers)
-                        if recording and job_type != 'translate_transcription':
+                        if recording and job_type not in NON_MUTATING_JOB_TYPES:
                             # Keep the recording with FAILED status so user can see the error and fix settings
                             recording.status = 'FAILED'
                             # Format the error for nice display. A failed summary
@@ -468,13 +513,13 @@ class FairJobQueue:
                         # permanent failure that follows the retry loop.
                         # Translation jobs are excluded from webhook/email
                         # emission per spec.
-                        if job_type != 'translate_transcription':
+                        if job_type not in NON_MUTATING_JOB_TYPES:
                             try:
                                 self._emit_failure_webhook(job_type, recording_id, error_str)
                             except Exception as e:
                                 logger.warning(f"Webhook emit on job {job_id} failure failed: {e}")
 
-                        if job_type != 'translate_transcription':
+                        if job_type not in NON_MUTATING_JOB_TYPES:
                             try:
                                 self._emit_failure_email(job_type, recording_id, error_str)
                             except Exception as e:
@@ -674,6 +719,24 @@ class FairJobQueue:
             params=params,
         )
 
+    def _run_embed_chunks(self, job, recording, params):
+        """Generate Inquire chunks/embeddings for a recording (embedding worker pool)."""
+        from src.database import db
+        from src.models import Recording
+        from src.services.embeddings import process_recording_chunks
+
+        # A missing recording or one with no transcription is a terminal
+        # no-op, not a transient failure: do not raise and let the retry
+        # machinery spin on it.
+        rec = db.session.get(Recording, recording.id)
+        if rec is None or not rec.transcription:
+            logger.info(f"Skipping embed_chunks for recording {recording.id}: no recording or transcription")
+            return
+
+        ok = process_recording_chunks(recording.id)
+        if not ok:
+            raise RuntimeError(f"chunk processing returned False for recording {recording.id}")
+
     def enqueue(
         self,
         user_id: int,
@@ -726,7 +789,7 @@ class FairJobQueue:
                 # Update recording status based on job type
                 recording = db.session.get(Recording, recording_id)
                 if recording:
-                    if job_type == 'translate_transcription':
+                    if job_type in NON_MUTATING_JOB_TYPES:
                         # Leave recording status untouched.
                         pass
                     elif job_type in SUMMARY_JOBS:
@@ -760,7 +823,7 @@ class FairJobQueue:
                 if not self._running:
                     self.start()
 
-                queue_name = 'summary' if job_type in SUMMARY_JOBS else 'transcription'
+                queue_name = queue_name_for_job_type(job_type)
                 logger.info(f"Enqueued {queue_name} job {job.id} (type={job_type}) for user {user_id}, recording {recording_id}")
                 return job.id
 
@@ -780,7 +843,7 @@ class FairJobQueue:
             for job in orphaned:
                 job.status = 'queued'
                 job.started_at = None
-                queue_name = 'summary' if job.job_type in SUMMARY_JOBS else 'transcription'
+                queue_name = queue_name_for_job_type(job.job_type)
                 logger.info(f"Recovered orphaned {queue_name} job {job.id} for recording {job.recording_id}")
 
             if orphaned:
@@ -810,6 +873,15 @@ class FairJobQueue:
                 ProcessingJob.job_type.in_(SUMMARY_JOBS)
             ).count()
 
+            embedding_queued = ProcessingJob.query.filter(
+                ProcessingJob.status == 'queued',
+                ProcessingJob.job_type.in_(EMBEDDING_JOBS)
+            ).count()
+            embedding_processing = ProcessingJob.query.filter(
+                ProcessingJob.status == 'processing',
+                ProcessingJob.job_type.in_(EMBEDDING_JOBS)
+            ).count()
+
             return {
                 "transcription_queue": {
                     "queued": transcription_queued,
@@ -820,6 +892,11 @@ class FairJobQueue:
                     "queued": summary_queued,
                     "processing": summary_processing,
                     "workers": SUMMARY_WORKERS
+                },
+                "embedding_queue": {
+                    "queued": embedding_queued,
+                    "processing": embedding_processing,
+                    "workers": EMBEDDING_WORKERS
                 },
                 "is_running": self._running
             }
@@ -838,7 +915,7 @@ class FairJobQueue:
                 return None
 
             # Determine which queue this job is in
-            job_types = SUMMARY_JOBS if job.job_type in SUMMARY_JOBS else TRANSCRIPTION_JOBS
+            job_types = job_types_for_queue_name(queue_name_for_job_type(job.job_type))
 
             # Count jobs of the same type created before this one
             position = ProcessingJob.query.filter(

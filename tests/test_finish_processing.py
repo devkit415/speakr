@@ -62,7 +62,7 @@ def _rec(made, user_id, **kwargs):
 def _side_effects():
     return (patch.object(proc, "apply_team_tag_auto_shares"),
             patch.object(proc, "export_recording"),
-            patch.object(proc, "process_recording_chunks"),
+            patch.object(proc, "job_queue"),
             patch.object(proc, "ENABLE_AUTO_EXPORT", True),
             patch.object(proc, "ENABLE_INQUIRE_MODE", True))
 
@@ -81,7 +81,9 @@ def test_user_title_without_summary_is_indexed_for_inquire(made):
             proc.generate_title_task(app.app_context(), r.id, will_auto_summarize=False)
         db.session.expire_all()
         assert db.session.get(Recording, r.id).status == "COMPLETED"
-        m_chunks.assert_called_once_with(r.id)
+        m_chunks.enqueue.assert_called_once()
+        assert m_chunks.enqueue.call_args.kwargs.get("job_type") == "embed_chunks"
+        assert m_chunks.enqueue.call_args.kwargs.get("recording_id") == r.id
         m_shares.assert_called_once_with(r.id)
         m_export.assert_called_once_with(r.id)
 
@@ -100,7 +102,9 @@ def test_short_transcription_still_runs_the_finishing_steps(made):
         assert out.summary == "[Summary skipped due to short transcription]"
         m_shares.assert_called_once_with(r.id)
         m_export.assert_called_once_with(r.id)
-        m_chunks.assert_called_once_with(r.id)
+        m_chunks.enqueue.assert_called_once()
+        assert m_chunks.enqueue.call_args.kwargs.get("job_type") == "embed_chunks"
+        assert m_chunks.enqueue.call_args.kwargs.get("recording_id") == r.id
 
 
 def test_normal_summary_runs_each_finishing_step_once(made):
@@ -118,7 +122,9 @@ def test_normal_summary_runs_each_finishing_step_once(made):
         assert out.summarization_duration_seconds is not None
         m_shares.assert_called_once_with(r.id)
         m_export.assert_called_once_with(r.id)
-        m_chunks.assert_called_once_with(r.id)
+        m_chunks.enqueue.assert_called_once()
+        assert m_chunks.enqueue.call_args.kwargs.get("job_type") == "embed_chunks"
+        assert m_chunks.enqueue.call_args.kwargs.get("recording_id") == r.id
 
 
 def test_a_failing_export_leaves_the_recording_completed(made):
@@ -131,7 +137,9 @@ def test_a_failing_export_leaves_the_recording_completed(made):
             proc.finish_processing(r.id)
         db.session.expire_all()
         assert db.session.get(Recording, r.id).status == "COMPLETED"
-        m_chunks.assert_called_once_with(r.id)
+        m_chunks.enqueue.assert_called_once()
+        assert m_chunks.enqueue.call_args.kwargs.get("job_type") == "embed_chunks"
+        assert m_chunks.enqueue.call_args.kwargs.get("recording_id") == r.id
 
 
 def _make_connector(text):

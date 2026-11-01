@@ -9,7 +9,6 @@ import json
 import re
 import mimetypes
 import time
-import threading
 import subprocess
 import uuid
 from datetime import date, datetime, timedelta, timezone
@@ -87,6 +86,16 @@ SUMMARY_NEEDS_PREFIXES = [
 
 # Configuration from environment
 ENABLE_INQUIRE_MODE = os.environ.get('ENABLE_INQUIRE_MODE', 'false').lower() == 'true'
+
+
+def _safe_log_error(message, **kwargs):
+    """Log an error via current_app when an app context is available."""
+    try:
+        current_app.logger.error(message, **kwargs)
+    except RuntimeError:
+        pass
+
+
 ENABLE_AUTO_DELETION = os.environ.get('ENABLE_AUTO_DELETION', 'false').lower() == 'true'
 DELETION_MODE = os.environ.get('DELETION_MODE', 'full_recording')  # 'audio_only' or 'full_recording'
 USERS_CAN_DELETE = os.environ.get('USERS_CAN_DELETE', 'true').lower() == 'true'
@@ -155,29 +164,44 @@ def _needs_speakers_condition():
     )
 
 def reindex_recording_chunks_async(recording_id):
-    """Rebuild a recording's semantic-search (Inquire) chunks in the background.
+    """Schedule a rebuild of a recording's semantic-search (Inquire) chunks.
 
     The Inquire/RAG chunks are a snapshot of recording.transcription. When the
     transcription text changes — speaker names applied, transcript edited — the
     chunks must be rebuilt or Inquire keeps answering from the stale text (e.g.
-    'SPEAKER_00' instead of the applied name). Runs in a daemon thread so the
-    edit's HTTP response isn't blocked on embedding generation; no-op when
-    Inquire mode is off. process_recording_chunks deletes-then-recreates with
-    rollback safety, so a failure leaves the previous chunks intact.
+    'SPEAKER_00' instead of the applied name). Enqueues a persistent
+    ``embed_chunks`` job so the edit's HTTP response is not blocked on
+    embedding generation; no-op when Inquire mode is off or the recording is
+    missing or has no owner. process_recording_chunks deletes-then-recreates
+    with rollback safety, so a failure leaves the previous chunks intact.
     """
     if not ENABLE_INQUIRE_MODE:
         return
-    app_obj = current_app._get_current_object()
 
-    def _run():
-        with app_obj.app_context():
-            try:
-                process_recording_chunks(recording_id)
-                app_obj.logger.info(f"Reindexed Inquire chunks for recording {recording_id} after edit")
-            except Exception as e:
-                app_obj.logger.error(f"Failed to reindex Inquire chunks for recording {recording_id}: {e}", exc_info=True)
+    try:
+        from src.models import Recording
+        recording = db.session.get(Recording, recording_id)
+    except Exception as e:
+        _safe_log_error(f"Failed to look up recording {recording_id} for reindex: {e}")
+        return
 
-    threading.Thread(target=_run, name=f"reindex-chunks-{recording_id}", daemon=True).start()
+    if recording is None:
+        _safe_log_error(f"Recording {recording_id} not found for Inquire reindex")
+        return
+
+    user_id = recording.user_id
+    if user_id is None:
+        _safe_log_error(f"Recording {recording_id} has no owner; skipping Inquire reindex")
+        return
+
+    try:
+        job_queue.enqueue(
+            user_id=user_id,
+            recording_id=recording_id,
+            job_type='embed_chunks',
+        )
+    except Exception as e:
+        _safe_log_error(f"Failed to schedule Inquire reindex for recording {recording_id}: {e}", exc_info=True)
 
 
 # Global helpers (will be injected from app)
@@ -3709,7 +3733,10 @@ def get_job_queue_status():
     """
     try:
         from src.models import ProcessingJob
-        from src.services.job_queue import TRANSCRIPTION_JOBS, SUMMARY_JOBS
+        from src.services.job_queue import (
+            TRANSCRIPTION_JOBS, SUMMARY_JOBS, EMBEDDING_JOBS,
+            queue_name_for_job_type, job_types_for_queue_name,
+        )
         from datetime import timedelta
 
         # Expire all cached objects to ensure we see latest data from worker threads
@@ -3736,12 +3763,12 @@ def get_job_queue_status():
                 recording_title = recording.title or recording.original_filename or 'Untitled'
 
             # Determine queue type
-            queue_type = 'summary' if job.job_type in SUMMARY_JOBS else 'transcription'
+            queue_type = queue_name_for_job_type(job.job_type)
 
             # Calculate position if queued
             position = None
             if job.status == 'queued':
-                job_types = SUMMARY_JOBS if job.job_type in SUMMARY_JOBS else TRANSCRIPTION_JOBS
+                job_types = job_types_for_queue_name(queue_type)
                 ahead_in_queue = ProcessingJob.query.filter(
                     ProcessingJob.status == 'queued',
                     ProcessingJob.job_type.in_(job_types),

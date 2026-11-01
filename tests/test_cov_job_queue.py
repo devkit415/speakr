@@ -2,7 +2,7 @@
 
 These complement tests/test_job_queue_race_condition.py (which covers the
 atomic-claim concurrency path). Here we drive the public + internal methods
-directly with workers OFF (conftest sets JOB_QUEUE_WORKERS=SUMMARY_QUEUE_WORKERS=0),
+directly with workers OFF (conftest sets JOB_QUEUE_WORKERS=SUMMARY_QUEUE_WORKERS=EMBEDDING_QUEUE_WORKERS=0),
 mocking the task functions, storage materialize layer, and webhook emission so
 no real audio processing or network I/O happens.
 
