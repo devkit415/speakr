@@ -2033,27 +2033,7 @@ def update_transcription(recording_id):
         return jsonify(api_error('unexpected_error_updating_transcription')), 500
 
 
-def _canonical_translation_language(value):
-    """Resolve a user-supplied target language to a canonical full name.
-
-    Accepts either the full language name or its ISO code (as listed in
-    OUTPUT_LANGUAGES). Returns None for anything not recognised.
-    """
-    if value is None:
-        return None
-    needle = str(value).strip()
-    if not needle:
-        return None
-    lowered = needle.lower()
-    try:
-        from src.utils.language import OUTPUT_LANGUAGES
-
-        for name, iso in OUTPUT_LANGUAGES:
-            if name.lower() == lowered or str(iso).lower() == lowered:
-                return name
-    except Exception:
-        pass
-    return None
+from src.utils.language import canonical_translation_language as _canonical_translation_language
 
 
 @recordings_bp.route('/recording/<int:recording_id>/translate_transcription', methods=['POST'])

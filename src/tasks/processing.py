@@ -2414,8 +2414,9 @@ def transcribe_with_connector(app_context, recording_id, filepath, original_file
                     target_language = None
                     if getattr(user, 'output_language', None):
                         try:
-                            from src.api.recordings import _canonical_translation_language
-                            target_language = _canonical_translation_language(user.output_language) or user.output_language
+                            from src.utils.language import canonical_translation_language
+
+                            target_language = canonical_translation_language(user.output_language) or user.output_language
                         except Exception:
                             target_language = user.output_language
                     else:

@@ -155,3 +155,23 @@ def output_language_name_for_code(code):
         if iso.lower() == needle:
             return name
     return None
+
+
+def canonical_translation_language(value):
+    """Resolve a user-supplied target language to a canonical full name.
+
+    Accepts either the full language name or its ISO code (as listed in
+    OUTPUT_LANGUAGES). Returns None for anything not recognised. Centralised
+    here so the web route and the auto-translate trigger share one definition
+    instead of reaching into a private helper of the recordings blueprint.
+    """
+    if value is None:
+        return None
+    needle = str(value).strip()
+    if not needle:
+        return None
+    lowered = needle.lower()
+    for name, iso in OUTPUT_LANGUAGES:
+        if name.lower() == lowered or str(iso).lower() == lowered:
+            return name
+    return None

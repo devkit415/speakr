@@ -43,37 +43,25 @@ def _resolve_target_language(user_id, target_language):
 
 
 def _prefix_cache_parts():
-    try:
-        from src.tasks.processing import (
-            PREFIX_CACHE_OPTIMIZED_PROMPTS,
-            _SHARED_LLM_SYSTEM_MSG,
-            _shared_user_prefix,
-        )
+    from src.tasks.processing import (
+        PREFIX_CACHE_OPTIMIZED_PROMPTS,
+        _SHARED_LLM_SYSTEM_MSG,
+        _shared_user_prefix,
+    )
 
-        return bool(PREFIX_CACHE_OPTIMIZED_PROMPTS), _SHARED_LLM_SYSTEM_MSG, _shared_user_prefix
-    except Exception:
-        return False, None, None
+    return bool(PREFIX_CACHE_OPTIMIZED_PROMPTS), _SHARED_LLM_SYSTEM_MSG, _shared_user_prefix
 
 
 def _clean_llm_response(text):
-    try:
-        from src.tasks.processing import clean_llm_response
+    from src.tasks.processing import clean_llm_response
 
-        return clean_llm_response(text)
-    except Exception:
-        return (text or '').strip()
+    return clean_llm_response(text)
 
 
 def _safe_json_loads(text, fallback=None):
-    try:
-        from src.utils import safe_json_loads
+    from src.utils import safe_json_loads
 
-        return safe_json_loads(text, fallback)
-    except Exception:
-        try:
-            return json.loads(text)
-        except Exception:
-            return fallback
+    return safe_json_loads(text, fallback)
 
 
 def _call_llm(messages, user_id, prefix_opt):
@@ -156,12 +144,12 @@ def translate_json_segments(text, user_id, target_language):
         return translate_plain_text(text, user_id, target_language)
 
     # Detect whether this is actually a segment list.
-    is_segments = all(isinstance(item, dict) and 'sentence' in item for item in data)
+    is_segments = all(isinstance(item, dict) and ('sentence' in item or 'text' in item) for item in data)
     if not is_segments:
         # Could be a JSON array of strings; treat as plain text.
         return translate_plain_text(text, user_id, target_language)
 
-    sentences = [item.get('sentence', '') for item in data]
+    sentences = [item.get('sentence', item.get('text', '')) for item in data]
 
     limit = _transcript_limit()
     # Chunk sentences without truncating.
@@ -197,7 +185,12 @@ def translate_json_segments(text, user_id, target_language):
     new_data = []
     for idx, item in enumerate(data):
         new_item = dict(item)
-        new_item['sentence'] = translated_all[idx]
+        if 'sentence' in item:
+            new_item['sentence'] = translated_all[idx]
+        elif 'text' in item:
+            new_item['text'] = translated_all[idx]
+        else:
+            new_item['sentence'] = translated_all[idx]
         # Preserve speaker, start_time, end_time unchanged (already present).
         new_data.append(new_item)
 
