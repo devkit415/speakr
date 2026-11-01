@@ -47,7 +47,8 @@ def test_reject_missing_keys(monkeypatch):
         end = content.rfind('}')
         payload = _j.loads(content[start:end + 1])
         keys = list(payload.keys())
-        return _j.dumps({keys[0]: "x"}, ensure_ascii=False)
+        # Always drop the last key, so even a single sentence comes back empty.
+        return _j.dumps({k: "x" for k in keys[:-1]}, ensure_ascii=False)
 
     monkeypatch.setattr(tt, '_call_llm', fake_call)
     text = json.dumps([{"speaker": "A", "sentence": "Hello"}, {"speaker": "B", "sentence": "Hi"}])
@@ -90,7 +91,12 @@ def test_malformed_segment_response_is_not_translated_as_plain_text(monkeypatch)
     ])
     with pytest.raises(ValueError):
         tt.translate_transcription_text(text, user_id=None, target_language="Spanish")
-    assert len(calls) == 1, 'the segment chunk must not be re-sent as plain text'
+    # The chunk is split and re-sent as segments, never as one plain-text value.
+    sent = []
+    for m in calls:
+        c = m[-1]['content']
+        sent.append(json.loads(c[c.find('{'):c.rfind('}') + 1]))
+    assert all(set(p) <= {"1", "2"} for p in sent), 'the segment chunk must not be re-sent as plain text'
 
 
 def test_invalid_json_array_falls_back_to_plain_text(monkeypatch):

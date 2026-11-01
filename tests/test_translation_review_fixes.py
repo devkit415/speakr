@@ -71,11 +71,11 @@ def test_no_limit_setting_still_sends_one_call_for_a_short_transcript(monkeypatc
     own call; the chunk size no longer depends on that setting."""
     calls = []
     monkeypatch.setattr(tt, '_call_llm', _echo(calls))
-    text = json.dumps([{"speaker": "A", "sentence": f"Sentence number {i}."} for i in range(50)])
+    text = json.dumps([{"speaker": "A", "sentence": f"Sentence number {i}."} for i in range(20)])
     with app.app_context(), patch('src.models.SystemSetting.get_setting', return_value=-1):
         out = json.loads(tt.translate_transcription_text(text, target_language="Spanish"))
     assert len(calls) == 1
-    assert len(out) == 50
+    assert len(out) == 20
 
 
 def test_a_long_transcript_is_split_into_output_sized_chunks(monkeypatch):
@@ -89,6 +89,41 @@ def test_a_long_transcript_is_split_into_output_sized_chunks(monkeypatch):
     assert len(calls) > 1
     assert all(sum(len(v) for v in c.values()) <= tt.TRANSLATION_CHUNK_CHARS for c in calls)
 
+
+
+def test_a_chunk_holds_at_most_the_segment_cap(monkeypatch):
+    calls = []
+    monkeypatch.setattr(tt, '_call_llm', _echo(calls))
+    text = json.dumps([{"speaker": "A", "sentence": f"Short {i}."} for i in range(60)])
+    with app.app_context():
+        out = json.loads(tt.translate_transcription_text(text, target_language="Spanish"))
+    assert [len(c) for c in calls] == [25, 25, 10]
+    assert [o["sentence"] for o in out] == [f"Short {i}. [es]" for i in range(60)]
+
+
+def test_a_dropped_key_splits_the_chunk_and_keeps_each_sentence_in_place(monkeypatch):
+    """A model that skips a sentence shifts every later translation up one key;
+    the response is discarded and each half is sent again."""
+    calls = []
+
+    def skipping_model(messages, user_id, prefix_opt):
+        content = messages[-1]['content']
+        payload = json.loads(content[content.find('{'):content.rfind('}') + 1])
+        calls.append(list(payload))
+        keys = list(payload)
+        if len(keys) > 4:
+            # Skip the third sentence and move the rest up one key.
+            values = [payload[k] for k in keys if k != keys[2]]
+            return json.dumps({k: v + " [es]" for k, v in zip(keys, values)})
+        return json.dumps({k: v + " [es]" for k, v in payload.items()})
+
+    monkeypatch.setattr(tt, '_call_llm', skipping_model)
+    text = json.dumps([{"speaker": f"S{i}", "start_time": i, "sentence": f"Line {i}."} for i in range(10)])
+    with app.app_context():
+        out = json.loads(tt.translate_transcription_text(text, target_language="Spanish"))
+    assert [o["sentence"] for o in out] == [f"Line {i}. [es]" for i in range(10)]
+    assert [o["speaker"] for o in out] == [f"S{i}" for i in range(10)]
+    assert len(calls[0]) == 10 and len(calls) > 1
 
 # 2. A failed save reaches the job -------------------------------------------
 

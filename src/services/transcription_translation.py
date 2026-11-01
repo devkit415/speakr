@@ -15,6 +15,10 @@ import time
 # caps summary input instead, and its -1 ("no limit") would send every segment
 # as a separate call. 6000 characters is about 1500-2500 output tokens.
 TRANSLATION_CHUNK_CHARS = 6000
+# Smaller models lose their place in long numbered lists: from about 30
+# segments on, a sentence is skipped and every later translation moves up
+# one key, so text would be stored under the wrong speaker and time.
+TRANSLATION_CHUNK_SEGMENTS = 25
 
 
 def _chunk_limit():
@@ -139,6 +143,27 @@ def _llm_translate_payload(payload, user_id, target_language, prefix_opt):
     return parsed
 
 
+def _translate_payload_split(payload, user_id, target_language, prefix_opt):
+    """Translate a payload, halving it when the model drops or shifts keys.
+
+    After a missing key, every later translation may sit one key too early,
+    so the whole response is discarded and each half is sent again.
+    """
+    try:
+        return _llm_translate_payload(payload, user_id, target_language, prefix_opt)
+    except ValueError as e:
+        if 'mismatched keys' not in str(e) or len(payload) < 2:
+            raise
+    keys = list(payload)
+    half = len(keys) // 2
+    result = {}
+    for part in (keys[:half], keys[half:]):
+        result.update(
+            _translate_payload_split({k: payload[k] for k in part}, user_id, target_language, prefix_opt)
+        )
+    return result
+
+
 def translate_json_segments(text, user_id, target_language):
     """Translate a JSON list of transcript segments, preserving structure."""
     data = json.loads(text)
@@ -160,7 +185,7 @@ def translate_json_segments(text, user_id, target_language):
     current_len = 0
     for sentence in sentences:
         piece_len = len(sentence or '') + 10
-        if current and current_len + piece_len > limit:
+        if current and (current_len + piece_len > limit or len(current) >= TRANSLATION_CHUNK_SEGMENTS):
             chunks.append(current)
             current = []
             current_len = 0
@@ -174,7 +199,7 @@ def translate_json_segments(text, user_id, target_language):
     for chunk in chunks:
         non_empty = [i for i, s in enumerate(chunk) if (s or '').strip()]
         payload = {str(i + 1): (chunk[i] if chunk[i] is not None else '') for i in non_empty}
-        parsed = _llm_translate_payload(payload, user_id, target_language, prefix_opt) if payload else {}
+        parsed = _translate_payload_split(payload, user_id, target_language, prefix_opt) if payload else {}
         for i in range(len(chunk)):
             if i in non_empty:
                 value = parsed.get(str(i + 1)) if isinstance(parsed, dict) else None
@@ -246,7 +271,7 @@ def translate_plain_text(text, user_id, target_language):
         # model that omits an empty key cannot fail an otherwise valid chunk.
         non_empty = [i for i, p in enumerate(paras) if (p or '').strip()]
         payload = {str(i): paras[i] for i in non_empty}
-        parsed = _llm_translate_payload(payload, user_id, target_language, prefix_opt) if payload else {}
+        parsed = _translate_payload_split(payload, user_id, target_language, prefix_opt) if payload else {}
         translated_paras = []
         for i in range(len(paras)):
             if i in non_empty:
