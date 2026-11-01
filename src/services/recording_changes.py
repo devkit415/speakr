@@ -27,7 +27,7 @@ import json
 import os
 from datetime import datetime, timedelta
 
-from sqlalchemy import event, or_, and_, func
+from sqlalchemy import event, or_, and_, func, select
 from sqlalchemy.orm import Session
 
 from src.database import db
@@ -41,14 +41,15 @@ TRACKED_FIELDS = (
 )
 
 # Column -> the word in recording.updated fields_changed. Columns not listed
-# (status, completed_at, error_message) move updated_at but fire no
-# recording.updated; the lifecycle events cover them.
+# (status, completed_at, error_message, transcription_translation) move
+# updated_at but fire no recording.updated; the lifecycle events cover the
+# first three, and translations are not part of the webhook contract.
 WEBHOOK_FIELD_NAMES = {
     'title': 'title', 'participants': 'participants', 'notes': 'notes', 'summary': 'summary',
     'transcription': 'transcript', 'meeting_date': 'meeting_date', 'folder_id': 'folder_id',
     'is_inbox': 'is_inbox', 'is_highlighted': 'is_highlighted', 'is_archived': 'is_archived',
     'speaker_label_map': 'speakers', 'audio_deleted_at': 'audio', 'deletion_exempt': 'deletion_exempt',
-    'prompt_variables': 'prompt_variables', 'transcription_translation': 'translation',
+    'prompt_variables': 'prompt_variables',
 }
 
 SETTLE_SECONDS = 2
@@ -112,6 +113,30 @@ def _changed_fields(session, recording):
     return [name for name in TRACKED_FIELDS if name in keys and state.attrs[name].history.has_changes()]
 
 
+def _reconcile_translation(session, recording):
+    """A changed transcript updates or clears its stored translation, unless
+    the translation was written in the same flush."""
+    from sqlalchemy import inspect as sa_inspect
+    from src.services.transcription_translation import reconcile_translation
+    attrs = sa_inspect(recording).attrs
+    if 'transcription_translation' not in attrs.keys():
+        return
+    history = attrs['transcription'].history
+    if not history.has_changes() or attrs['transcription_translation'].history.has_changes():
+        return
+    with session.no_autoflush:
+        if history.deleted:
+            previous = history.deleted[0]
+        else:
+            # The old value was expired (for example by an earlier commit in
+            # the same request); the row still holds it until this flush.
+            from src.models import Recording
+            previous = session.execute(
+                select(Recording.transcription).where(Recording.id == recording.id)
+            ).scalar()
+        reconcile_translation(recording, previous)
+
+
 def _before_flush(session, flush_context, instances):
     from src.models import InternalShare, Recording
     now = datetime.utcnow()
@@ -126,6 +151,7 @@ def _before_flush(session, flush_context, instances):
 
     for obj in session.dirty:
         if isinstance(obj, Recording) and session.is_modified(obj, include_collections=False):
+            _reconcile_translation(session, obj)
             fields = _changed_fields(session, obj)
             if fields:
                 obj.updated_at = now

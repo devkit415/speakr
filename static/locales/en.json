@@ -2082,8 +2082,8 @@
     "transcriptionReprocessingStarted": "Transcription reprocessing started",
     "translationInProgress": "Translation already in progress",
     "translationFailed": "Translation failed",
-    "noTranslationToCopy": "No transcription available to copy.",
-    "noTranslationToDownload": "No transcription available to download."
+    "noTranslationToCopy": "No translation available to copy.",
+    "noTranslationToDownload": "No translation available to download."
   },
   "metadata": {
     "cancelEdit": "Cancel",

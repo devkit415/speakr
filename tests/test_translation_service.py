@@ -121,7 +121,7 @@ def test_plain_text_paragraphs(monkeypatch):
 
 
 def test_chunking_no_truncation(monkeypatch):
-    monkeypatch.setattr(tt, '_transcript_limit', lambda: 20)
+    monkeypatch.setattr(tt, "_chunk_limit", lambda: 20)
     calls = []
 
     def fake_call(messages, user_id, prefix_opt):

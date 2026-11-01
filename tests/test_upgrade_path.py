@@ -217,12 +217,7 @@ def test_recording_translation_columns_exist_after_upgrade(upgraded):
 
 def test_recording_schema_reaches_current_model(upgraded):
     """Mirror of test_no_column_is_lost for the recording table."""
-    con = sqlite3.connect(upgraded["path"])
-    before_cols = {row[1] for row in con.execute('PRAGMA table_info("recording")')}
-    con.close()
-
-    # Re-derive the pre-upgrade column set from the fixture is not possible here,
-    # so instead assert every column of the current model is present after upgrade.
+    # Every column of the current model is present after the upgrade.
     live_con = sqlite3.connect(upgraded["path"])
     after_cols = {row[1] for row in live_con.execute('PRAGMA table_info("recording")')}
     live_con.close()

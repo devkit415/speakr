@@ -10,13 +10,15 @@ import re
 import time
 
 
-def _transcript_limit():
-    try:
-        from src.models import SystemSetting
+# Each chunk has to come back from the model as one complete JSON object, so
+# its size is bounded by the model's output limit. transcript_length_limit
+# caps summary input instead, and its -1 ("no limit") would send every segment
+# as a separate call. 6000 characters is about 1500-2500 output tokens.
+TRANSLATION_CHUNK_CHARS = 6000
 
-        return SystemSetting.get_setting('transcript_length_limit', 30000)
-    except Exception:
-        return 30000
+
+def _chunk_limit():
+    return TRANSLATION_CHUNK_CHARS
 
 
 def _resolve_target_language(user_id, target_language):
@@ -151,7 +153,7 @@ def translate_json_segments(text, user_id, target_language):
 
     sentences = [item.get('sentence', item.get('text', '')) for item in data]
 
-    limit = _transcript_limit()
+    limit = _chunk_limit()
     # Chunk sentences without truncating.
     chunks = []
     current = []
@@ -199,7 +201,7 @@ def translate_json_segments(text, user_id, target_language):
 
 def translate_plain_text(text, user_id, target_language):
     """Translate plain text, splitting at paragraph boundaries."""
-    limit = _transcript_limit()
+    limit = _chunk_limit()
     # Split while preserving separators.
     tokens = re.split(r'(\n\s*\n)', text)
     blocks = []
@@ -387,17 +389,9 @@ def translate_transcription(*args, **kwargs):
         else:
             recording.translation_duration_seconds = max(
                 0, int(round(time.time() - translation_start_time)))
-        try:
-            from src.database import db
+        from src.database import db
 
-            db.session.commit()
-        except Exception:
-            try:
-                from src.database import db
-
-                db.session.commit()
-            except Exception:
-                pass
+        db.session.commit()
         return translated
 
     if text is None:
@@ -407,3 +401,50 @@ def translate_transcription(*args, **kwargs):
 
     return translate_transcription_text(
         text, user_id, target_language, source_language=source_language)
+
+
+def _segment_list(text):
+    """The transcript as a list of segment dicts, or None for plain text."""
+    if not text or not isinstance(text, str) or not text.strip().startswith('['):
+        return None
+    try:
+        data = json.loads(text)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if isinstance(data, list) and all(isinstance(item, dict) for item in data):
+        return data
+    return None
+
+
+def reconcile_translation(recording, previous_transcription):
+    """Bring a stored translation in line with a changed transcript.
+
+    When only speakers or timestamps changed (a speaker rename, merge or
+    assignment), they are copied into the translation segment by segment. Any
+    other change, including clearing the transcript, removes the translation,
+    because its text no longer matches the original.
+    """
+    if not recording.transcription_translation:
+        return
+    old = _segment_list(previous_transcription)
+    new = _segment_list(recording.transcription)
+    translated = _segment_list(recording.transcription_translation)
+    if (old is not None and new is not None and translated is not None
+            and len(old) == len(new) == len(translated)
+            and all(o.get('sentence') == n.get('sentence') for o, n in zip(old, new))):
+        synced = []
+        for segment, source in zip(translated, new):
+            segment = dict(segment)
+            for key in ('speaker', 'start_time', 'end_time'):
+                if key in source:
+                    segment[key] = source[key]
+                else:
+                    segment.pop(key, None)
+            synced.append(segment)
+        synced_text = json.dumps(synced, ensure_ascii=False)
+        if synced_text != recording.transcription_translation:
+            recording.transcription_translation = synced_text
+        return
+    recording.transcription_translation = None
+    recording.transcription_translation_language = None
+    recording.translation_duration_seconds = None

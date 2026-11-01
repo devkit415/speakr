@@ -3791,6 +3791,16 @@ def retry_failed_job(job_id):
         if job.status != 'failed':
             return jsonify(api_error('job_retry_failed_only')), 400
 
+        # Only one job of a type may be queued or running per recording
+        # (ux_processing_job_active_type), so a newer one blocks the retry.
+        active = ProcessingJob.query.filter(
+            ProcessingJob.recording_id == job.recording_id,
+            ProcessingJob.job_type == job.job_type,
+            ProcessingJob.status.in_(['queued', 'processing']),
+        ).first()
+        if active:
+            return jsonify(api_error('recording_already_processing')), 409
+
         # Reset job for retry
         job.status = 'queued'
         job.error_message = None
@@ -3802,7 +3812,12 @@ def retry_failed_job(job_id):
         current_app.logger.info(f"Job {job_id} queued for retry by user {current_user.id}")
         return jsonify({'success': True, 'message': translate('server.apiMessage.jobQueuedForRetry')})
 
+    except IntegrityError:
+        # A job of the same type was queued between the check and the commit.
+        db.session.rollback()
+        return jsonify(api_error('recording_already_processing')), 409
     except Exception as e:
+        db.session.rollback()
         current_app.logger.error(f"Error retrying job {job_id}: {e}", exc_info=True)
         return jsonify(api_error('unexpected_error')), 500
 
