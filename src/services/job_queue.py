@@ -36,7 +36,7 @@ POLL_INTERVAL = 1.0  # seconds between checking for new jobs
 # Every consumer routes via "SUMMARY_JOBS if ... else TRANSCRIPTION_JOBS", so
 # membership in this list is the single source of truth for the whole pipeline.
 TRANSCRIPTION_JOBS = ['transcribe', 'reprocess_transcription', 'stitch', 'merge']
-SUMMARY_JOBS = ['summarize', 'reprocess_summary']
+SUMMARY_JOBS = ['summarize', 'reprocess_summary', 'translate_transcription']
 
 
 class FairJobQueue:
@@ -73,6 +73,10 @@ class FairJobQueue:
         self._last_user_id_summary = None
         # Lock for claiming jobs (SQLite doesn't support row-level locking)
         self._claim_lock = threading.Lock()
+        # Serialise the check-then-insert in enqueue(). The active-job unique
+        # index is the cross-process guarantee; this lock keeps same-process
+        # callers from racing into it in the first place.
+        self._enqueue_lock = threading.Lock()
         # Whether this process won the queue-owner election (see startup.initialize_job_queue)
         self._is_owner = False
         self._initialized = True
@@ -362,6 +366,8 @@ class FairJobQueue:
                     self._run_stitch(job, recording, params)
                 elif job_type == 'merge':
                     self._run_merge(job, recording, params)
+                elif job_type == 'translate_transcription':
+                    self._run_translation(job, recording, params)
                 else:
                     raise ValueError(f"Unknown job type: {job_type}")
 
@@ -376,19 +382,19 @@ class FairJobQueue:
                 # Webhook fan-out (#275). One emit per job-type completion;
                 # subscribers map these to user-visible lifecycle events.
                 # Best-effort: if the webhook subsystem throws, the job is
-                # still marked completed.
-                try:
-                    self._emit_completion_webhook(job_type, recording_id)
-                except Exception as e:
-                    logger.warning(f"Webhook emit on job {job_id} completion failed: {e}")
+                # still marked completed. Translation jobs are excluded from
+                # webhook/email emission per spec.
+                if job_type != 'translate_transcription':
+                    try:
+                        self._emit_completion_webhook(job_type, recording_id)
+                    except Exception as e:
+                        logger.warning(f"Webhook emit on job {job_id} completion failed: {e}")
 
-                # Email notification (#386), independent of webhooks so a user
-                # can have one without the other. Also best-effort: an SMTP
-                # server that is down must not fail a completed job.
-                try:
-                    self._emit_completion_email(job_type, recording_id)
-                except Exception as e:
-                    logger.warning(f"Completion email for job {job_id} failed: {e}")
+                if job_type != 'translate_transcription':
+                    try:
+                        self._emit_completion_email(job_type, recording_id)
+                    except Exception as e:
+                        logger.warning(f"Completion email for job {job_id} failed: {e}")
 
             except Exception as e:
                 error_str = str(e)
@@ -439,7 +445,7 @@ class FairJobQueue:
 
                         # Always keep recordings with FAILED status so users can see the error
                         # and reprocess later (e.g., when ASR server recovers)
-                        if recording:
+                        if recording and job_type != 'translate_transcription':
                             # Keep the recording with FAILED status so user can see the error and fix settings
                             recording.status = 'FAILED'
                             # Format the error for nice display. A failed summary
@@ -460,15 +466,19 @@ class FairJobQueue:
                         # retryable-failure case does not emit because the
                         # subscriber will see the eventual success or
                         # permanent failure that follows the retry loop.
-                        try:
-                            self._emit_failure_webhook(job_type, recording_id, error_str)
-                        except Exception as e:
-                            logger.warning(f"Webhook emit on job {job_id} failure failed: {e}")
+                        # Translation jobs are excluded from webhook/email
+                        # emission per spec.
+                        if job_type != 'translate_transcription':
+                            try:
+                                self._emit_failure_webhook(job_type, recording_id, error_str)
+                            except Exception as e:
+                                logger.warning(f"Webhook emit on job {job_id} failure failed: {e}")
 
-                        try:
-                            self._emit_failure_email(job_type, recording_id, error_str)
-                        except Exception as e:
-                            logger.warning(f"Failure email for job {job_id} failed: {e}")
+                        if job_type != 'translate_transcription':
+                            try:
+                                self._emit_failure_email(job_type, recording_id, error_str)
+                            except Exception as e:
+                                logger.warning(f"Failure email for job {job_id} failed: {e}")
 
                     db.session.commit()
 
@@ -650,6 +660,20 @@ class FairJobQueue:
             db.session.commit()
             raise
 
+    def _run_translation(self, job, recording, params):
+        """Translate a recording's transcription (summary worker pool)."""
+        from flask import current_app
+        from src.tasks.processing import translate_transcription_task
+
+        params = params or {}
+        translate_transcription_task(
+            current_app._get_current_object().app_context(),
+            recording.id,
+            user_id=params.get('user_id', job.user_id),
+            target_language=params.get('target_language'),
+            params=params,
+        )
+
     def enqueue(
         self,
         user_id: int,
@@ -674,46 +698,71 @@ class FairJobQueue:
         with self._app_context():
             from src.database import db
             from src.models import ProcessingJob, Recording
+            from sqlalchemy.exc import IntegrityError
 
-            # Check for existing active job of the SAME TYPE for this recording
-            # Allow different job types to coexist (e.g., transcribe and summarize)
-            existing = ProcessingJob.query.filter(
-                ProcessingJob.recording_id == recording_id,
-                ProcessingJob.job_type == job_type,
-                ProcessingJob.status.in_(['queued', 'processing'])
-            ).first()
+            with self._enqueue_lock:
+                # Check for existing active job of the SAME TYPE for this recording
+                # Allow different job types to coexist (e.g., transcribe and summarize)
+                existing = ProcessingJob.query.filter(
+                    ProcessingJob.recording_id == recording_id,
+                    ProcessingJob.job_type == job_type,
+                    ProcessingJob.status.in_(['queued', 'processing'])
+                ).first()
 
-            if existing:
-                logger.warning(f"Job of type {job_type} already exists for recording {recording_id}: {existing.id}")
-                return existing.id
+                if existing:
+                    logger.warning(f"Job of type {job_type} already exists for recording {recording_id}: {existing.id}")
+                    return existing.id
 
-            # Create new job
-            job = ProcessingJob(
-                user_id=user_id,
-                recording_id=recording_id,
-                job_type=job_type,
-                params=json.dumps(params) if params else None,
-                is_new_upload=is_new_upload
-            )
-            db.session.add(job)
+                # Create new job
+                job = ProcessingJob(
+                    user_id=user_id,
+                    recording_id=recording_id,
+                    job_type=job_type,
+                    params=json.dumps(params) if params else None,
+                    is_new_upload=is_new_upload
+                )
+                db.session.add(job)
 
-            # Update recording status based on job type
-            recording = db.session.get(Recording, recording_id)
-            if recording:
-                if job_type in SUMMARY_JOBS:
-                    recording.status = 'SUMMARIZING'
-                else:
-                    recording.status = 'QUEUED'
+                # Update recording status based on job type
+                recording = db.session.get(Recording, recording_id)
+                if recording:
+                    if job_type == 'translate_transcription':
+                        # Leave recording status untouched.
+                        pass
+                    elif job_type in SUMMARY_JOBS:
+                        recording.status = 'SUMMARIZING'
+                    else:
+                        recording.status = 'QUEUED'
 
-            db.session.commit()
+                try:
+                    db.session.commit()
+                except IntegrityError:
+                    # Another process inserted an active job between our check
+                    # and this commit. The partial unique index on
+                    # (recording_id, job_type) rejected ours: answer with the
+                    # winner so callers still see one job id per recording and
+                    # type.
+                    db.session.rollback()
+                    existing = ProcessingJob.query.filter(
+                        ProcessingJob.recording_id == recording_id,
+                        ProcessingJob.job_type == job_type,
+                        ProcessingJob.status.in_(['queued', 'processing'])
+                    ).first()
+                    if existing:
+                        logger.info(
+                            f"Job of type {job_type} was created concurrently for recording "
+                            f"{recording_id}: {existing.id}"
+                        )
+                        return existing.id
+                    raise
 
-            # Auto-start workers if not running (no-op unless this process owns the queue)
-            if not self._running:
-                self.start()
+                # Auto-start workers if not running (no-op unless this process owns the queue)
+                if not self._running:
+                    self.start()
 
-            queue_name = 'summary' if job_type in SUMMARY_JOBS else 'transcription'
-            logger.info(f"Enqueued {queue_name} job {job.id} (type={job_type}) for user {user_id}, recording {recording_id}")
-            return job.id
+                queue_name = 'summary' if job_type in SUMMARY_JOBS else 'transcription'
+                logger.info(f"Enqueued {queue_name} job {job.id} (type={job_type}) for user {user_id}, recording {recording_id}")
+                return job.id
 
     def recover_orphaned_jobs(self):
         """

@@ -507,7 +507,8 @@
       "uploadDisclaimerDesc": "Aviso legal mostrado antes dos uploads de arquivo. Suporta Markdown. Deixe em branco para desabilitar.",
       "customBannerDesc": "Banner personalizado mostrado no topo da página. Suporta Markdown. Deixe em branco para desabilitar.",
       "transcriptLengthLimitDesc": "Número máximo de caracteres para enviar da transcrição ao LLM para resumo e chat. Use -1 para nenhum limite.",
-      "maxAudioOnlyVideoSizeDesc": "Tamanho máximo (em MB) para envios de vídeo em modo apenas-áudio. Apenas o áudio extraído é armazenado, portanto o envio em si pode ser maior que o limite habitual."
+      "maxAudioOnlyVideoSizeDesc": "Tamanho máximo (em MB) para envios de vídeo em modo apenas-áudio. Apenas o áudio extraído é armazenado, portanto o envio em si pode ser maior que o limite habitual.",
+      "disableAutoTranslationDesc": "Quando habilitado, as gravações são apenas transcritas e os usuários precisam iniciar a tradução manualmente. Quando desabilitado, cada usuário pode ativar a tradução automática de novas gravações após a transcrição."
     },
     "storageUsed": "ARMAZENAMENTO USADO",
     "summarizationInstructions": "Instruções de Resumo",
@@ -923,7 +924,8 @@
     "saveFolder": "Salvar pasta",
     "send": "Enviar",
     "addParticipant": "Adicionar participante",
-    "deleteShareLink": "Excluir link de compartilhamento"
+    "deleteShareLink": "Excluir link de compartilhamento",
+    "reprocessTranslation": "Reprocessar tradução"
   },
   "changePasswordModal": {
     "confirmPassword": "Confirmar Nova Senha",
@@ -1694,7 +1696,8 @@
   "headerActions": {
     "deleteRecording": "Excluir gravação",
     "more": "Mais ações",
-    "reprocess": "Reprocessar"
+    "reprocess": "Reprocessar",
+    "reprocessTranslation": "Reprocessar tradução"
   },
   "help": {
     "actions": "Ações",
@@ -2076,7 +2079,11 @@
     "summaryReprocessingStarted": "Reprocessamento do resumo iniciado",
     "summarySaved": "Resumo salvo!",
     "tagsReordered": "Etiquetas reordenadas",
-    "transcriptionReprocessingStarted": "Reprocessamento da transcrição iniciado"
+    "transcriptionReprocessingStarted": "Reprocessamento da transcrição iniciado",
+    "translationInProgress": "A tradução já está em andamento",
+    "translationFailed": "Falha na tradução",
+    "noTranslationToCopy": "Nenhuma tradução disponível para copiar.",
+    "noTranslationToDownload": "Nenhuma tradução disponível para baixar."
   },
   "metadata": {
     "cancelEdit": "Cancelar",
@@ -2186,6 +2193,9 @@
     "storageQuotaReached": "{{filename}} ficou na pasta monitorada porque seu armazenamento está cheio ({{used_mb}} MB de {{quota_mb}} MB). Ele será adicionado quando houver espaço."
   },
   "preferences": {
+    "autoTranslation": "Traduzir automaticamente novas gravações",
+    "autoTranslationDisabled": "A tradução automática foi desativada pelo administrador.",
+    "autoTranslationHelp": "Quando habilitado, cada nova gravação é traduzida automaticamente para o seu Idioma Preferido para Chatbot e Resumo assim que a transcrição terminar. Quando desabilitado (padrão), você gera a tradução manualmente pelo botão Gerar tradução. As traduções usam os mesmos tokens de IA de uma tradução manual e contam para o seu orçamento mensal de tokens.",
     "description": "Preferências de exibição e comportamento do editor. Estas configurações ficam salvas em sua conta e se aplicam a todos os dispositivos.",
     "editorAutosave": "Salvar automaticamente as edições no editor de transcrição",
     "editorAutosaveHelp": "Quando habilitado, as edições no editor de transcrição são salvas automaticamente alguns segundos após você parar de digitar. Quando desabilitado (padrão), você salva explicitamente pelos botões Salvar ou pelo Ctrl+S.",
@@ -2203,7 +2213,8 @@
     "showTimestampsSimpleView": "Mostrar marcações de tempo na visualização simples",
     "showTimestampsSimpleViewHelp": "Exibe uma marcação de tempo compacta mm:ss ao lado de cada rótulo de orador na visualização simples. A visualização em balões não é afetada.",
     "transcriptDisplay": "Exibição da transcrição",
-    "transcriptEditor": "Editor de transcrição"
+    "transcriptEditor": "Editor de transcrição",
+    "translation": "Tradução"
   },
   "preview": {
     "liveUpdateNote": "A seção Instruções de Resumo é atualizada à medida que você edita seu prompt personalizado acima. Os espaços reservados são substituídos pelos valores reais quando uma gravação é processada.",
@@ -2830,7 +2841,11 @@
     "playbackSpeedTapToChange": "Velocidade de reprodução (toque para alterar)",
     "switchToBubbleView": "Mudar para visualização em balões",
     "switchToSimpleView": "Mudar para visualização simples",
-    "tagDragToReorder": "{{name}} (arraste para reorganizar)"
+    "tagDragToReorder": "{{name}} (arraste para reorganizar)",
+    "translateTranscript": "Traduzir transcrição",
+    "reprocessTranslation": "Reprocessar tradução",
+    "translateTranscriptIncognito": "A tradução não está disponível para gravações incógnitas.",
+    "editTranslation": "Editar tradução"
   },
   "transcriptTemplates": {
     "availableTemplates": "Modelos Disponíveis",
@@ -3499,7 +3514,11 @@
       "share_permissions_invalid": "can_edit e can_reshare devem ser true ou false",
       "share_permissions_required": "Envie can_edit, can_reshare ou ambos",
       "share_update_denied": "Somente a pessoa que compartilhou esta gravação pode alterar essas permissões",
-      "share_source_locked": "Este compartilhamento vem de uma tag ou pasta de grupo, e suas permissões seguem esse grupo"
+      "share_source_locked": "Este compartilhamento vem de uma tag ou pasta de grupo, e suas permissões seguem esse grupo",
+      "translation_no_transcription": "Nenhuma transcrição disponível para tradução.",
+      "translation_blocked_transcription_failed": "Não é possível traduzir: a transcrição falhou. Reprocesse a transcrição primeiro.",
+      "translation_llm_not_configured": "O serviço de tradução não está disponível (cliente LLM não configurado)",
+      "translation_invalid_language": "Idioma de destino desconhecido."
     },
     "apiMessage": {
       "accountUpdated": "Dados da conta atualizados com sucesso!",
@@ -3542,7 +3561,8 @@
       "transcriptionUpdated": "Transcrição atualizada com sucesso.",
       "userAlreadyHasNamingTemplates": "O usuário já tem modelos de nomenclatura",
       "userAlreadyHasTemplates": "O usuário já tem modelos",
-      "voiceProfileCleared": "Perfil de voz de {{name}} apagado"
+      "voiceProfileCleared": "Perfil de voz de {{name}} apagado",
+      "translationQueued": "Tradução na fila"
     },
     "form": {
       "required": "Este campo é obrigatório.",
@@ -3678,5 +3698,16 @@
     "emailVerifiedHeading": "E-mail verificado!",
     "emailVerifiedHelp": "Seu endereço de e-mail foi verificado com sucesso. Agora você pode entrar na sua conta.",
     "continueToLogin": "Continuar para o login"
+  },
+  "translation": {
+    "title": "Tradução",
+    "noTranslation": "Nenhuma tradução disponível",
+    "generate": "Gerar tradução",
+    "generateTitle": "Gerar tradução",
+    "inProgress": "Tradução em andamento...",
+    "targetLanguage": "Idioma de destino",
+    "preferences": "Preferências de tradução",
+    "toggle": "Alternar tradução",
+    "incognitoUnavailable": "A tradução não está disponível para gravações incógnitas."
   }
 }

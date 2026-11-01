@@ -27,6 +27,7 @@ class TokenTracker:
         'query_routing',
         'query_enrichment',
         'embedding',
+        'translation',
     ]
 
     # Token magnitudes and per-token costs differ by orders of magnitude

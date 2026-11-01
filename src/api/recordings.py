@@ -219,7 +219,12 @@ def download_transcript_with_template(recording_id):
         if not recording or not has_recording_access(recording, current_user):
             return jsonify(api_error('recording_not_found')), 404
 
-        if not recording.transcription:
+        use_translation = request.args.get('translation') in ('1', 'true', 'yes')
+        source_transcription = recording.transcription
+        if use_translation and recording.transcription_translation:
+            source_transcription = recording.transcription_translation
+
+        if not source_transcription:
             return jsonify(api_error('no_transcription_for_recording')), 400
 
         # Get template ID from query params
@@ -270,7 +275,7 @@ def download_transcript_with_template(recording_id):
         is_diarized = False
         transcription_data = None
         try:
-            transcription_data = json.loads(recording.transcription)
+            transcription_data = json.loads(source_transcription)
             if isinstance(transcription_data, list):
                 is_diarized = True
         except (json.JSONDecodeError, TypeError):
@@ -279,7 +284,7 @@ def download_transcript_with_template(recording_id):
 
         # If plain text transcription, return it as-is (no template formatting applies)
         if not is_diarized:
-            formatted_transcript = recording.transcription
+            formatted_transcript = source_transcription
         else:
             # Generate formatted transcript from diarized segments
             output_lines = []
@@ -1317,6 +1322,18 @@ def index(recording_id=None, label_name=None):
     # Pass the ASR config, inquire mode config, and user language preference to the template
     user_language = current_user.ui_language if current_user.is_authenticated and current_user.ui_language else 'en'
 
+    # Default target language for the translation modal: the account's
+    # preferred output language, falling back to the interface language
+    # (translation spec). The endpoint applies the same fallback when no
+    # target is sent, so the modal simply shows what will be used.
+    default_translation_language = ''
+    if current_user.is_authenticated:
+        if getattr(current_user, 'output_language', None):
+            default_translation_language = _canonical_translation_language(current_user.output_language) or ''
+        if not default_translation_language:
+            from src.utils.language import output_language_name_for_code
+            default_translation_language = output_language_name_for_code(user_language) or ''
+
     # The "Audio removed" filter matters when retention removes audio; users
     # who can delete recordings can also remove audio by hand.
     enable_audio_removed_filter = (ENABLE_AUTO_DELETION and DELETION_MODE == 'audio_only') or USERS_CAN_DELETE or current_user.is_admin
@@ -1391,6 +1408,7 @@ def index(recording_id=None, label_name=None):
                          enable_audio_removed_filter=enable_audio_removed_filter,
                          enable_internal_sharing=ENABLE_INTERNAL_SHARING,
                          user_language=user_language,
+                         default_translation_language=default_translation_language,
                          is_team_admin=is_team_admin,
                          server_recording_chunks_enabled=server_recording_chunks_enabled,
                          recording_max_hours=recording_max_hours,
@@ -1981,14 +1999,19 @@ def update_transcription(recording_id):
         if not has_recording_access(recording, current_user, require_edit=True):
             return jsonify(api_error('recording_edit_denied')), 403
 
-        data = request.json
+        data = request.json or {}
         new_transcription = data.get('transcription')
+        new_translation = data.get('transcription_translation')
 
-        if new_transcription is None:
+        if new_transcription is None and new_translation is None:
             return jsonify(api_error('no_transcription_data')), 400
 
         # The incoming data could be a JSON string (from ASR edit) or plain text
-        recording.transcription = new_transcription
+        if new_transcription is not None:
+            recording.transcription = new_transcription
+        if new_translation is not None:
+            recording.transcription_translation = new_translation
+            # Keep transcription_translation_language unchanged.
 
         # Optional: If the transcription changes, we might want to indicate that the summary is outdated.
         # For now, we'll just save the transcript. A "regenerate summary" button could be a good follow-up.
@@ -2007,6 +2030,77 @@ def update_transcription(recording_id):
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error updating transcription for recording {recording_id}: {e}", exc_info=True)
+        return jsonify(api_error('unexpected_error_updating_transcription')), 500
+
+
+from src.utils.language import canonical_translation_language as _canonical_translation_language
+
+
+@recordings_bp.route('/recording/<int:recording_id>/translate_transcription', methods=['POST'])
+@login_required
+def translate_transcription(recording_id):
+    """Queue a translation of a recording's transcription."""
+    try:
+        recording = db.session.get(Recording, recording_id)
+        if not recording or not has_recording_access(recording, current_user):
+            return jsonify(api_error('recording_not_found')), 404
+
+        if not has_recording_access(recording, current_user, require_edit=True):
+            return jsonify(api_error('recording_edit_denied')), 403
+
+        if not recording.transcription or len(recording.transcription.strip()) < 10:
+            return jsonify(api_error('translation_no_transcription')), 400
+
+        from src.utils.error_formatting import is_transcription_error
+        if is_transcription_error(recording.transcription):
+            return jsonify(api_error('translation_blocked_transcription_failed')), 400
+
+        from src.services.llm import TRANSLATION_MODEL_CONFIGURED
+        if not TRANSLATION_MODEL_CONFIGURED:
+            return jsonify(api_error('translation_llm_not_configured')), 503
+
+        data = request.get_json(silent=True) or {}
+        raw_target = data.get('target_language')
+
+        if raw_target is None or str(raw_target).strip() == '':
+            # Resolve to the user's output language, then interface language.
+            target_language = None
+            if getattr(current_user, 'output_language', None):
+                target_language = _canonical_translation_language(current_user.output_language)
+            if not target_language:
+                try:
+                    from src.utils.language import output_language_name_for_code
+
+                    target_language = output_language_name_for_code(getattr(current_user, 'ui_language', None))
+                except Exception:
+                    target_language = None
+        else:
+            target_language = _canonical_translation_language(raw_target)
+            if target_language is None:
+                return jsonify(api_error('translation_invalid_language')), 400
+
+        from src.services.job_queue import job_queue
+
+        job_params = {'user_id': current_user.id}
+        if target_language:
+            job_params['target_language'] = target_language
+
+        job_id = job_queue.enqueue(
+            user_id=current_user.id,
+            recording_id=recording.id,
+            job_type='translate_transcription',
+            params=job_params,
+        )
+
+        return jsonify({
+            'success': True,
+            'job_id': job_id,
+            'message': translate('server.apiMessage.translationQueued')
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error starting translation for recording {recording_id}: {e}", exc_info=True)
         return jsonify(api_error('unexpected_error_updating_transcription')), 500
 
 # Toggle inbox status endpoint

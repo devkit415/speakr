@@ -336,6 +336,15 @@ def _run_migrations(app, engine):
         # webhook simply omits the field when it is not known.
         if add_column_if_not_exists(engine, 'recording', 'transcription_language', 'VARCHAR(20)'):
             app.logger.info("Added transcription_language column to recording table")
+        # Language the user explicitly requested when transcribing (#translation).
+        # NULL means auto-detect; existing rows stay NULL because the original
+        # request is not recoverable from the reported language.
+        if add_column_if_not_exists(engine, 'recording', 'transcription_requested_language', 'VARCHAR(20)'):
+            app.logger.info("Added transcription_requested_language column to recording table")
+        if add_column_if_not_exists(engine, 'recording', 'transcription_translation', 'TEXT'):
+            app.logger.info("Added transcription_translation column to recording table")
+        if add_column_if_not_exists(engine, 'recording', 'transcription_translation_language', 'VARCHAR(50)'):
+            app.logger.info("Added transcription_translation_language column to recording table")
         if add_column_if_not_exists(engine, 'recording', 'audio_duration_seconds', 'FLOAT'):
             app.logger.info("Added audio_duration_seconds column to recording table")
         if add_column_if_not_exists(engine, 'recording', 'completed_at', 'DATETIME'):
@@ -400,6 +409,8 @@ def _run_migrations(app, engine):
             app.logger.info("Added audio_duration_seconds column to recording table")
         if add_column_if_not_exists(engine, 'recording', 'summarization_duration_seconds', 'INTEGER'):
             app.logger.info("Added summarization_duration_seconds column to recording table")
+        if add_column_if_not_exists(engine, 'recording', 'translation_duration_seconds', 'INTEGER'):
+            app.logger.info("Added translation_duration_seconds column to recording table")
         if add_column_if_not_exists(engine, 'recording', 'processing_source', "VARCHAR(50) DEFAULT 'upload'"):
             app.logger.info("Added processing_source column to recording table")
         if add_column_if_not_exists(engine, 'recording', 'error_message', 'TEXT'):
@@ -573,6 +584,10 @@ def _run_migrations(app, engine):
         # Auto summarization setting (per-user, default enabled)
         if add_column_if_not_exists(engine, 'user', 'auto_summarization', 'BOOLEAN DEFAULT 1'):
             app.logger.info("Added auto_summarization column to user table")
+
+        # Auto-translation preference (per-user, default disabled) (#translation)
+        if add_column_if_not_exists(engine, 'user', 'auto_translation', 'BOOLEAN DEFAULT 0'):
+            app.logger.info("Added auto_translation column to user table")
 
         # Transcription hints (hotwords and initial prompt for improving ASR accuracy)
         if add_column_if_not_exists(engine, 'user', 'transcription_hotwords', 'TEXT'):
@@ -985,6 +1000,48 @@ def _run_migrations(app, engine):
         except Exception as e:
             app.logger.warning(f"Could not create index on recording.folder_id: {e}")
 
+    with _migration_section(app, failures, "active processing job uniqueness"):
+        # One active job per (recording, job_type). enqueue() checks first, but
+        # two concurrent requests (two tabs, two summary workers, two app
+        # processes) can both pass the check before either inserts, which used
+        # to queue duplicate translations and duplicate summaries. The partial
+        # unique index makes the check-then-insert atomic at the database.
+        # SQLite and PostgreSQL both support partial indexes; other backends
+        # fall back to the in-process lock in enqueue().
+        if engine.dialect.name in ('sqlite', 'postgresql'):
+            try:
+                with engine.begin() as conn:
+                    dupes = conn.execute(text(
+                        "SELECT recording_id, job_type, MAX(id) FROM processing_job "
+                        "WHERE status IN ('queued', 'processing') "
+                        "GROUP BY recording_id, job_type HAVING COUNT(*) > 1"
+                    )).fetchall()
+                    for recording_id, job_type, keep_id in dupes:
+                        conn.execute(text(
+                            "UPDATE processing_job SET status = 'failed', "
+                            "completed_at = CURRENT_TIMESTAMP, "
+                            "error_message = COALESCE(error_message, '') || "
+                            "' (superseded by a concurrent duplicate job)' "
+                            "WHERE recording_id = :r AND job_type = :t "
+                            "AND status IN ('queued', 'processing') AND id <> :keep"
+                        ), {'r': recording_id, 't': job_type, 'keep': keep_id})
+                    if dupes:
+                        app.logger.warning(
+                            "Marked duplicate active processing jobs as failed in %d groups",
+                            len(dupes),
+                        )
+                    conn.execute(text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS ux_processing_job_active_type "
+                        "ON processing_job (recording_id, job_type) "
+                        "WHERE status IN ('queued', 'processing')"
+                    ))
+            except Exception as e:
+                # Never block startup on this: enqueue() still has its lock and
+                # its IntegrityError fallback, and a database that rejects the
+                # partial index (an old engine, an exotic backend) keeps the
+                # previous best-effort behaviour.
+                app.logger.warning(f"Could not create active processing job unique index: {e}")
+
     with _migration_section(app, failures, "default system settings"):
         # Initialize default system settings
         if not SystemSetting.query.filter_by(key='transcript_length_limit').first():
@@ -1123,6 +1180,15 @@ def _run_migrations(app, engine):
                 setting_type='boolean'
             )
             app.logger.info("Initialized disable_auto_summarization setting")
+
+        if not SystemSetting.query.filter_by(key='disable_auto_translation').first():
+            SystemSetting.set_setting(
+                key='disable_auto_translation',
+                value='true',
+                description='Disable automatic translation after transcription completes. When enabled, recordings will only be transcribed and users must manually trigger translation.',
+                setting_type='boolean'
+            )
+            app.logger.info("Initialized disable_auto_translation setting")
 
         if not SystemSetting.query.filter_by(key='admin_default_hotwords').first():
             SystemSetting.set_setting(

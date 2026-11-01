@@ -102,6 +102,25 @@ def _client_logged_in_as(user):
 
 
 @contextlib.contextmanager
+def _auto_translation_admin(allow):
+    """Set the global auto-translation switch the account page reads, then
+    restore it so other tests keep the shipped default (disabled)."""
+    from src.models import SystemSetting
+    row = SystemSetting.query.filter_by(key='disable_auto_translation').first()
+    old_value = row.value if row else None
+    SystemSetting.set_setting('disable_auto_translation', 'false' if allow else 'true',
+                              setting_type='boolean')
+    try:
+        yield
+    finally:
+        if old_value is None:
+            SystemSetting.query.filter_by(key='disable_auto_translation').delete()
+        else:
+            SystemSetting.set_setting('disable_auto_translation', old_value, setting_type='boolean')
+        db.session.commit()
+
+
+@contextlib.contextmanager
 def _envset(**overrides):
     saved = {k: os.environ.get(k) for k in overrides}
     try:
@@ -433,6 +452,60 @@ def test_account_preferences_without_the_field_keep_default_recording_sort(clean
     assert db.session.get(User, uid).default_recording_sort == 'meeting_date'
 
 
+def test_account_preferences_persist_auto_translation_when_admin_allows(cleanup_users):
+    user = _mk_user(cleanup_users)
+    uid = user.id
+    assert user.auto_translation is False
+    with _auto_translation_admin(allow=True):
+        with _client_logged_in_as(user) as client:
+            client.post('/account', data={
+                'preferences_form': '1',
+                'ui_language': 'en',
+                'auto_translation_shown': '1',
+                'auto_translation': 'on',
+            })
+    assert db.session.get(User, uid).auto_translation is True
+
+
+def test_account_preferences_refuse_auto_translation_when_admin_disables(cleanup_users):
+    user = _mk_user(cleanup_users)
+    uid = user.id
+    with _auto_translation_admin(allow=False):
+        with _client_logged_in_as(user) as client:
+            client.post('/account', data={
+                'preferences_form': '1',
+                'ui_language': 'en',
+                'auto_translation_shown': '1',
+                'auto_translation': 'on',
+            })
+    assert db.session.get(User, uid).auto_translation is False
+
+
+def test_account_preferences_without_auto_translation_section_keeps_value(cleanup_users):
+    # The section disappears when the admin disables the feature; other form
+    # submissions must not clear a preference saved while it was available.
+    user = _mk_user(cleanup_users, auto_translation=True)
+    uid = user.id
+    with _client_logged_in_as(user) as client:
+        client.post('/account', data={'preferences_form': '1', 'ui_language': 'en'})
+    assert db.session.get(User, uid).auto_translation is True
+
+
+def test_account_page_shows_auto_translation_only_when_admin_allows(cleanup_users):
+    user = _mk_user(cleanup_users)
+    with _auto_translation_admin(allow=False):
+        with _client_logged_in_as(user) as client:
+            hidden = client.get('/account').get_data(as_text=True)
+    assert 'name="auto_translation"' not in hidden
+    assert 'Auto-translation is disabled by the administrator.' in hidden
+
+    with _auto_translation_admin(allow=True):
+        with _client_logged_in_as(user) as client:
+            shown = client.get('/account').get_data(as_text=True)
+    assert 'name="auto_translation"' in shown
+    assert 'Auto-translate new recordings' in shown
+
+
 def test_default_recording_sort_reaches_the_page_and_the_account_form(cleanup_users):
     import re
     user = _mk_user(cleanup_users)
@@ -454,6 +527,27 @@ def test_default_recording_sort_defaults_to_date_added_for_existing_accounts(cle
         account = client.get('/account').get_data(as_text=True)
     assert 'data-default-recording-sort="created_at"' in index
     assert re.search(r'value="created_at"\s+checked', account)
+
+
+def test_default_translation_language_follows_output_language(cleanup_users):
+    user = _mk_user(cleanup_users, ui_language='en', output_language='Spanish')
+    with _client_logged_in_as(user) as client:
+        index = client.get('/').get_data(as_text=True)
+    assert 'data-default-translation-language="Spanish"' in index
+
+
+def test_default_translation_language_falls_back_to_interface_language(cleanup_users):
+    user = _mk_user(cleanup_users, ui_language='es', output_language=None)
+    with _client_logged_in_as(user) as client:
+        index = client.get('/').get_data(as_text=True)
+    assert 'data-default-translation-language="Spanish"' in index
+
+
+def test_default_translation_language_is_english_for_english_interface(cleanup_users):
+    user = _mk_user(cleanup_users, ui_language='en', output_language=None)
+    with _client_logged_in_as(user) as client:
+        index = client.get('/').get_data(as_text=True)
+    assert 'data-default-translation-language="English"' in index
 
 
 def test_account_prompts_branch_persists_summary_prompt(cleanup_users):

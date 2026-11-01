@@ -23,6 +23,7 @@ __all__ = [
     'is_using_openai_api',
     'call_llm_completion',
     'call_chat_completion',
+    'call_translation_completion',
     'chat_client',
     'format_api_error_message',
     # Document services

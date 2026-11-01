@@ -507,7 +507,8 @@
       "uploadDisclaimerDesc": "Legal disclaimer shown before file uploads. Supports Markdown. Leave empty to disable.",
       "customBannerDesc": "Custom banner shown at the top of the page. Supports Markdown. Leave empty to disable.",
       "transcriptLengthLimitDesc": "Maximum number of characters to send from transcript to LLM for summarization and chat. Use -1 for no limit.",
-      "maxAudioOnlyVideoSizeDesc": "Maximum file size (in MB) for video uploads in audio-only mode. Only the extracted audio is stored, so the upload itself can be larger than the regular file-size limit."
+      "maxAudioOnlyVideoSizeDesc": "Maximum file size (in MB) for video uploads in audio-only mode. Only the extracted audio is stored, so the upload itself can be larger than the regular file-size limit.",
+      "disableAutoTranslationDesc": "When enabled, recordings are only transcribed and users must trigger translation manually. When disabled, each user can opt in to auto-translate new recordings after transcription."
     },
     "storageUsed": "STORAGE USED",
     "summarizationInstructions": "Summarization Instructions",
@@ -923,7 +924,8 @@
     "startReprocessing": "Start Reprocessing",
     "saveFolder": "Save Folder",
     "addParticipant": "Add Participant",
-    "deleteShareLink": "Delete Share Link"
+    "deleteShareLink": "Delete Share Link",
+    "reprocessTranslation": "Reprocess translation"
   },
   "changePasswordModal": {
     "confirmPassword": "Confirm New Password",
@@ -1694,7 +1696,8 @@
   "headerActions": {
     "deleteRecording": "Delete recording",
     "more": "More actions",
-    "reprocess": "Reprocess"
+    "reprocess": "Reprocess",
+    "reprocessTranslation": "Reprocess translation"
   },
   "help": {
     "actions": "Actions",
@@ -2076,7 +2079,11 @@
     "summaryReprocessingStarted": "Summary reprocessing started",
     "summarySaved": "Summary saved!",
     "tagsReordered": "Tags reordered",
-    "transcriptionReprocessingStarted": "Transcription reprocessing started"
+    "transcriptionReprocessingStarted": "Transcription reprocessing started",
+    "translationInProgress": "Translation already in progress",
+    "translationFailed": "Translation failed",
+    "noTranslationToCopy": "No transcription available to copy.",
+    "noTranslationToDownload": "No transcription available to download."
   },
   "metadata": {
     "cancelEdit": "Cancel",
@@ -2186,6 +2193,9 @@
     "storageQuotaReached": "{{filename}} was left in the watch folder because your storage is full ({{used_mb}} MB of {{quota_mb}} MB). It is added once there is room."
   },
   "preferences": {
+    "autoTranslation": "Auto-translate new recordings",
+    "autoTranslationDisabled": "Auto-translation is disabled by the administrator.",
+    "autoTranslationHelp": "When enabled, each new recording is translated automatically into the language you selected as your Preferred Chatbot and Summarization Language once transcription finishes. When disabled (default), you generate the translation yourself with the Generate Translation button. Translations use the same AI tokens as a manual one and count toward your monthly token budget.",
     "description": "Display and editor behaviour preferences. These settings are saved to your account and apply across devices.",
     "editorAutosave": "Auto-save edits in the transcript editor",
     "editorAutosaveHelp": "When enabled, edits in the transcript editor are saved automatically a couple of seconds after you stop typing. When disabled (default), you save explicitly via the Save buttons or Ctrl+S.",
@@ -2203,7 +2213,8 @@
     "showTimestampsSimpleView": "Show timestamps in simple view",
     "showTimestampsSimpleViewHelp": "Display a compact mm:ss timestamp next to each speaker label in the simple transcript view. The bubble view is unaffected.",
     "transcriptDisplay": "Transcript display",
-    "transcriptEditor": "Transcript editor"
+    "transcriptEditor": "Transcript editor",
+    "translation": "Translation"
   },
   "preview": {
     "placeholderLegend": "Placeholder legend:",
@@ -2830,7 +2841,11 @@
     "playbackSpeedTapToChange": "Playback speed (tap to change)",
     "switchToBubbleView": "Switch to bubble view",
     "switchToSimpleView": "Switch to simple view",
-    "tagDragToReorder": "{{name}} (drag to reorder)"
+    "tagDragToReorder": "{{name}} (drag to reorder)",
+    "translateTranscript": "Translate transcript",
+    "reprocessTranslation": "Reprocess translation",
+    "translateTranscriptIncognito": "Translation is unavailable for incognito recordings.",
+    "editTranslation": "Edit translation"
   },
   "transcriptTemplates": {
     "availableTemplates": "Available Templates",
@@ -3499,7 +3514,11 @@
       "share_permissions_invalid": "can_edit and can_reshare must be true or false",
       "share_permissions_required": "Send can_edit, can_reshare or both",
       "share_update_denied": "Only the person who shared this recording can change these permissions",
-      "share_source_locked": "This share comes from a group tag or folder, and its permissions follow that group"
+      "share_source_locked": "This share comes from a group tag or folder, and its permissions follow that group",
+      "translation_no_transcription": "No transcription available for translation.",
+      "translation_blocked_transcription_failed": "Cannot translate: transcription failed. Please reprocess the transcription first.",
+      "translation_llm_not_configured": "Translation service is not available (LLM client not configured)",
+      "translation_invalid_language": "Unknown target language."
     },
     "apiMessage": {
       "accountUpdated": "Account details updated successfully!",
@@ -3542,7 +3561,8 @@
       "transcriptionUpdated": "Transcription updated successfully.",
       "userAlreadyHasNamingTemplates": "User already has naming templates",
       "userAlreadyHasTemplates": "User already has templates",
-      "voiceProfileCleared": "Voice profile cleared for {{name}}"
+      "voiceProfileCleared": "Voice profile cleared for {{name}}",
+      "translationQueued": "Translation queued"
     },
     "form": {
       "required": "This field is required.",
@@ -3678,5 +3698,16 @@
     "emailVerifiedHeading": "Email Verified!",
     "emailVerifiedHelp": "Your email address has been successfully verified. You can now log in to your account.",
     "continueToLogin": "Continue to Login"
+  },
+  "translation": {
+    "title": "Translation",
+    "noTranslation": "No translation available",
+    "generate": "Generate Translation",
+    "generateTitle": "Generate translation",
+    "inProgress": "Translation in progress...",
+    "targetLanguage": "Target language",
+    "preferences": "Translation preferences",
+    "toggle": "Toggle translation",
+    "incognitoUnavailable": "Translation is unavailable for incognito recordings."
   }
 }

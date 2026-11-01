@@ -144,6 +144,9 @@ GPT5_FORCE_MODE=true
 
 # Same, for a separately configured chat model (not inherited from the above)
 # CHAT_GPT5_FORCE_MODE=true
+
+# Same, for a separately configured translation model (not inherited from the above)
+# TRANSLATION_GPT5_FORCE_MODE=true
 ```
 
 When both conditions are met, Speakr automatically:
@@ -338,6 +341,67 @@ CHAT_MODEL_NAME=gpt-4o
 - When using the same model for all operations is acceptable
 - Simple setups where configuration simplicity is preferred
 
+## Separate Translation Model Configuration
+
+Speakr can translate recordings with a dedicated model instead of the text model used for summaries and titles. This lets you send translation to a cheaper, faster or multilingual model while keeping the text model for the rest of the application. Speaker labels and timestamps are preserved regardless of the model; the model only translates the spoken text.
+
+The dedicated model is used for both manual translations and automatic translation after transcription. Translation token usage is recorded under the `translation` operation type, so it is separated from summaries and chat in the token statistics.
+
+### Configuration
+
+Add these optional environment variables to your `.env` file:
+
+```bash
+# Translation Model Configuration (Optional)
+# If not set, translation uses the TEXT_MODEL_* settings
+TRANSLATION_MODEL_API_KEY=your_translation_api_key
+TRANSLATION_MODEL_BASE_URL=https://openrouter.ai/api/v1
+TRANSLATION_MODEL_NAME=openai/gpt-4o-mini
+```
+
+A dedicated translation model needs `TRANSLATION_MODEL_NAME` and either its own key or its own base URL. Without both parts, Speakr falls back to the text model.
+
+### Fallback Behavior
+
+| Configuration | Behavior |
+|--------------|----------|
+| No `TRANSLATION_MODEL_*` variables set | Translation uses `TEXT_MODEL_*` settings (default) |
+| Only `TRANSLATION_MODEL_NAME` set | Falls back to `TEXT_MODEL_*` (a key or a base URL is required) |
+| Only `TRANSLATION_MODEL_API_KEY` set | Falls back to `TEXT_MODEL_*` (model name required) |
+| `TRANSLATION_MODEL_API_KEY` + `TRANSLATION_MODEL_NAME` set | Uses translation config with `TEXT_MODEL_BASE_URL` |
+| `TRANSLATION_MODEL_BASE_URL` + `TRANSLATION_MODEL_NAME` set | Uses a dedicated translation server; no key is sent unless `TRANSLATION_MODEL_API_KEY` is set (suits a local server) |
+| All `TRANSLATION_MODEL_*` variables set | Uses fully dedicated translation configuration |
+
+The text model's key is sent only to the text model's server. For a translation model on another server, set `TRANSLATION_MODEL_API_KEY`, or leave it unset for a local server that needs no authentication.
+
+### Example Configuration
+
+```bash
+# Summaries, titles and chat: general-purpose model
+TEXT_MODEL_BASE_URL=https://openrouter.ai/api/v1
+TEXT_MODEL_API_KEY=your_openrouter_key
+TEXT_MODEL_NAME=openai/gpt-4o-mini
+
+# Translation: cheaper multilingual model on the same provider
+TRANSLATION_MODEL_NAME=google/gemini-2.5-flash-lite
+TRANSLATION_MODEL_API_KEY=your_openrouter_key
+# Note: TRANSLATION_MODEL_BASE_URL not needed when the text model uses the same endpoint
+```
+
+### When to Use a Separate Translation Model
+
+**Recommended for**:
+
+- Translating long or numerous transcripts where a cheaper model is sufficient
+- Deployments that need a model with better coverage of the target languages
+- Routing translation to a local server while summaries and chat use a hosted API
+
+**Not needed for**:
+
+- Small deployments where the text model already translates well
+- When using the same model for all operations is acceptable
+- When translation is disabled and no user will trigger it manually
+
 ## Model Selection Guidelines
 
 ### For Summaries
@@ -378,7 +442,7 @@ After changing model configuration:
 
 ## Provider-Specific Request Parameters
 
-Reasoning ("thinking") is controlled differently by each provider, and some models think by default, which makes summaries and titles slower and more expensive. `TEXT_MODEL_EXTRA_BODY` holds a JSON object whose fields are added to every request to the text model. `CHAT_MODEL_EXTRA_BODY` is the same setting for a separately configured chat model.
+Reasoning ("thinking") is controlled differently by each provider, and some models think by default, which makes summaries, titles and translations slower and more expensive. `TEXT_MODEL_EXTRA_BODY` holds a JSON object whose fields are added to every request to the text model. `CHAT_MODEL_EXTRA_BODY` is the same setting for a separately configured chat model, and `TRANSLATION_MODEL_EXTRA_BODY` for a separately configured translation model.
 
 ```bash
 # Turn off thinking for a Qwen3 model on vLLM, SGLang or llama.cpp
@@ -397,7 +461,7 @@ The fields are sent unchanged, so they must be ones your provider and model acce
 The name of the `chat_template_kwargs` field depends on the model's chat template and is given on the model card.
 
 - The fields are added after Speakr's own parameters and replace any with the same name, including the GPT-5 settings and `max_tokens`.
-- When chat uses the text model, `TEXT_MODEL_EXTRA_BODY` applies to chat as well. A separately configured chat model does not inherit it.
+- When chat or translation uses the text model, `TEXT_MODEL_EXTRA_BODY` applies to it as well. A separately configured chat or translation model does not inherit it.
 - In `.env`, the JSON is written without surrounding quotes.
 - If the value is not a JSON object, requests to that model fail with an error that names the variable.
 - When a provider rejects a request, the log lists the fields added by this setting. Some servers ignore fields they do not recognise, so compare response times or token counts before and after a change to confirm its effect.
@@ -446,10 +510,20 @@ CHAT_MODEL_NAME=openai/gpt-4o
 CHAT_GPT5_REASONING_EFFORT=medium  # minimal, low, medium, high
 CHAT_GPT5_VERBOSITY=medium          # low, medium, high
 
+# Translation model configuration (optional - falls back to TEXT_MODEL_* if not set)
+TRANSLATION_MODEL_API_KEY=your_translation_api_key
+TRANSLATION_MODEL_BASE_URL=https://openrouter.ai/api/v1
+TRANSLATION_MODEL_NAME=openai/gpt-4o-mini
+
+# Optional: force GPT-5 parameter handling for a separately configured
+# translation model (not inherited from GPT5_FORCE_MODE)
+# TRANSLATION_GPT5_FORCE_MODE=true
+
 # Provider-specific request parameters, a JSON object (optional)
 # See Provider-Specific Request Parameters above
 TEXT_MODEL_EXTRA_BODY={"reasoning": {"effort": "low"}}
 CHAT_MODEL_EXTRA_BODY={"reasoning": {"effort": "low"}}
+TRANSLATION_MODEL_EXTRA_BODY={"reasoning": {"effort": "low"}}
 ```
 
 ## Prefix-Cache-Friendly Prompts (`PREFIX_CACHE_OPTIMIZED_PROMPTS`)

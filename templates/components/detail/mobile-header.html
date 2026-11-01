@@ -99,7 +99,11 @@
                 </button>
                 <button @click.stop="copyTranscription" class="btn btn--icon btn--sm" :title="t('tooltips.copyTranscript')"><i class="fas fa-copy"></i></button>
                 <button v-if="selectedRecording.transcription" @click.stop="downloadTranscript" class="btn btn--icon btn--sm" :title="t('tooltips.downloadTranscriptWithTemplate')"><i class="fas fa-download"></i></button>
-                <button v-if="selectedRecording.transcription" @click.stop="openTranscriptionEditor" class="btn btn--icon btn--sm" :title="t('tooltips.editTranscript')"><i class="fas fa-edit"></i></button>
+                <button v-if="selectedRecording && (viewingTranslation ? selectedRecording.transcription_translation : selectedRecording.transcription)" @click.stop="openTranscriptionEditor" class="btn btn--icon btn--sm" :title="viewingTranslation ? t('tooltips.editTranslation') : t('tooltips.editTranscript')"><i class="fas fa-edit"></i></button>
+                <button v-if="selectedRecording.transcription && !selectedRecording.incognito" @click.stop="generateTranslation()" class="btn btn--icon btn--sm" :title="t('tooltips.translateTranscript')" :disabled="translationJobActive"><i class="fas fa-language"></i></button>
+                <span v-if="selectedRecording.transcription && selectedRecording.incognito" class="btn btn--icon btn--sm" style="opacity: 0.5; cursor: not-allowed;" :title="t('tooltips.translateTranscriptIncognito')"><i class="fas fa-language"></i></span>
+                <button v-if="selectedRecording.transcription && !selectedRecording.incognito" @click.stop="openTranslationModal" class="btn btn--icon btn--sm" :title="t('translation.preferences')"><i class="fas fa-sliders-h"></i></button>
+                <button v-if="selectedRecording.transcription_translation" @click.stop="viewingTranslation = !viewingTranslation" class="btn btn--icon btn--sm" :title="t('translation.toggle')"><i class="fas fa-exchange-alt"></i></button>
             </template>
             <template v-else-if="mobileTab === 'events' && selectedRecording.events && selectedRecording.events.length > 0">
                 <button @click.stop="downloadICS" class="btn btn--icon btn--sm" :title="t('buttons.exportCalendar')">

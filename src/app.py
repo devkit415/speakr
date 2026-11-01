@@ -915,6 +915,12 @@ def inject_registration_flag():
     return {'registration_enabled': registration_enabled()}
 
 @app.context_processor
+def inject_output_languages():
+    """Shared list of output/translation target language names (#translation)."""
+    from src.utils.language import OUTPUT_LANGUAGES
+    return {'output_languages': OUTPUT_LANGUAGES}
+
+@app.context_processor
 def inject_group_admin_status():
     """Inject is_group_admin flag and the admin-group list into all templates.
 

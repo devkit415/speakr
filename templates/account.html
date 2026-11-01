@@ -1148,27 +1148,9 @@
                                         <label for="output_language" class="block text-sm font-medium text-[var(--text-muted)]" data-i18n="account.preferredOutputLanguage">Preferred Output Language</label>
                                         <select name="output_language" id="output_language" class="mt-1 block w-full px-3 py-2 border border-[var(--border-secondary)] rounded-md shadow-sm focus:outline-none focus:ring-[var(--border-focus)] focus:border-[var(--border-focus)] sm:text-sm bg-[var(--bg-input)] text-[var(--text-primary)]">
                                             <option value="" data-sort-pin="top" data-i18n="languages.defaultModelDecides" {% if not current_user.output_language %}selected{% endif %}>Default (model decides)</option>
-                                            <option value="English" data-i18n="languages.en" {% if current_user.output_language == 'English' %}selected{% endif %}>English</option>
-                                            <option value="Spanish" data-i18n="languages.es" {% if current_user.output_language == 'Spanish' %}selected{% endif %}>Spanish</option>
-                                            <option value="French" data-i18n="languages.fr" {% if current_user.output_language == 'French' %}selected{% endif %}>French</option>
-                                            <option value="German" data-i18n="languages.de" {% if current_user.output_language == 'German' %}selected{% endif %}>German</option>
-                                            <option value="Italian" data-i18n="languages.it" {% if current_user.output_language == 'Italian' %}selected{% endif %}>Italian</option>
-                                            <option value="Portuguese" data-i18n="languages.pt" {% if current_user.output_language == 'Portuguese' %}selected{% endif %}>Portuguese</option>
-                                            <option value="Dutch" data-i18n="languages.nl" {% if current_user.output_language == 'Dutch' %}selected{% endif %}>Dutch</option>
-                                            <option value="Russian" data-i18n="languages.ru" {% if current_user.output_language == 'Russian' %}selected{% endif %}>Russian</option>
-                                            <option value="Chinese" data-i18n="languages.zh" {% if current_user.output_language == 'Chinese' %}selected{% endif %}>Chinese</option>
-                                            <option value="Japanese" data-i18n="languages.ja" {% if current_user.output_language == 'Japanese' %}selected{% endif %}>Japanese</option>
-                                            <option value="Korean" data-i18n="languages.ko" {% if current_user.output_language == 'Korean' %}selected{% endif %}>Korean</option>
-                                            <option value="Arabic" data-i18n="languages.ar" {% if current_user.output_language == 'Arabic' %}selected{% endif %}>Arabic</option>
-                                            <option value="Hindi" data-i18n="languages.hi" {% if current_user.output_language == 'Hindi' %}selected{% endif %}>Hindi</option>
-                                            <option value="Polish" data-i18n="languages.pl" {% if current_user.output_language == 'Polish' %}selected{% endif %}>Polish</option>
-                                            <option value="Ukrainian" data-i18n="languages.uk" {% if current_user.output_language == 'Ukrainian' %}selected{% endif %}>Ukrainian</option>
-                                            <option value="Vietnamese" data-i18n="languages.vi" {% if current_user.output_language == 'Vietnamese' %}selected{% endif %}>Vietnamese</option>
-                                            <option value="Thai" data-i18n="languages.th" {% if current_user.output_language == 'Thai' %}selected{% endif %}>Thai</option>
-                                            <option value="Turkish" data-i18n="languages.tr" {% if current_user.output_language == 'Turkish' %}selected{% endif %}>Turkish</option>
-                                            <option value="Indonesian" data-i18n="languages.id" {% if current_user.output_language == 'Indonesian' %}selected{% endif %}>Indonesian</option>
-                                            <option value="Swedish" data-i18n="languages.sv" {% if current_user.output_language == 'Swedish' %}selected{% endif %}>Swedish</option>
-                                            <option value="Portuguese (Brazilian)" data-i18n="languages.pt-BR" {% if current_user.output_language == 'Portuguese (Brazilian)' %}selected{% endif %}>Portuguese (Brazilian)</option>
+                                            {% for _lang_name, _lang_code in output_languages %}
+                                            <option value="{{ _lang_name }}" data-i18n="languages.{{ _lang_code }}" {% if current_user.output_language == _lang_name %}selected{% endif %}>{{ _lang_name }}</option>
+                                            {% endfor %}
                                         </select>
                                         <p class="text-xs text-[var(--text-light)] mt-1" data-i18n="account.languageForSummaries">Language for titles, summaries, and chat. Leave on Default to follow the model's own behaviour.</p>
                                     </div>
@@ -1250,6 +1232,20 @@
                                         <span class="block text-xs text-[var(--text-muted)] mt-0.5" data-i18n="preferences.editorAutosaveHelp">When enabled, edits in the transcript editor are saved automatically a couple of seconds after you stop typing. When disabled (default), you save explicitly via the Save buttons or <code>Ctrl+S</code>.</span>
                                     </span>
                                 </label>
+
+                                <h3 class="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wide pt-4" data-i18n="preferences.translation">Translation</h3>
+                                {% if auto_translation_available %}
+                                <input type="hidden" name="auto_translation_shown" value="1">
+                                <label class="flex items-start gap-3 p-3 bg-[var(--bg-tertiary)] border border-[var(--border-secondary)] rounded-md cursor-pointer hover:bg-[var(--bg-accent-hover)]">
+                                    <input type="checkbox" id="prefAutoTranslation" name="auto_translation" {% if current_user.auto_translation %}checked{% endif %} class="mt-1 h-4 w-4 text-[var(--text-accent)] border-[var(--border-secondary)] rounded focus:ring-[var(--border-focus)] bg-[var(--bg-input)]">
+                                    <span class="flex-1">
+                                        <span class="block text-sm font-medium text-[var(--text-primary)]" data-i18n="preferences.autoTranslation">Auto-translate new recordings</span>
+                                        <span class="block text-xs text-[var(--text-muted)] mt-0.5" data-i18n="preferences.autoTranslationHelp">When enabled, each new recording is translated automatically into the language you selected as your Preferred Chatbot and Summarization Language once transcription finishes. When disabled (default), you generate the translation yourself with the Generate Translation button. Translations use the same AI tokens as a manual one and count toward your monthly token budget.</span>
+                                    </span>
+                                </label>
+                                {% else %}
+                                <p class="text-xs text-[var(--text-muted)] italic" data-i18n="preferences.autoTranslationDisabled">Auto-translation is disabled by the administrator.</p>
+                                {% endif %}
 
                                 <!-- Audio player position (was the Display
                                      tab; merged here because the only thing
